@@ -326,9 +326,16 @@ module Bosh::Dev::Sandbox
     def do_reset(name)
       @cpi.kill_agents
 
-      Redis.new(host: 'localhost', port: redis_port).flushdb
+      redis = Redis.new(host: 'localhost', port: redis_port)
+      Resque.redis = redis
+      until resque_is_done
+        @logger.debug('Waiting for Resque queue to drain')
+        sleep 0.1
+      end
 
-      # @database.truncate_db
+      redis.flushdb
+
+      @database.truncate_db
 
       FileUtils.rm_rf(blobstore_storage_dir)
       FileUtils.mkdir_p(blobstore_storage_dir)
@@ -336,6 +343,11 @@ module Bosh::Dev::Sandbox
       FileUtils.mkdir_p(director_tmp_path)
 
       reconfigure_director if director_configuration_changed?
+    end
+
+    def resque_is_done
+      info = Resque.info
+      info[:pending] == 0 && info[:working] == 0
     end
 
     def setup_sandbox_root
