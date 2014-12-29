@@ -328,7 +328,7 @@ module Bosh::Dev::Sandbox
 
       Redis.new(host: 'localhost', port: redis_port).flushdb
 
-      @database.truncate_db
+      # @database.truncate_db
 
       FileUtils.rm_rf(blobstore_storage_dir)
       FileUtils.mkdir_p(blobstore_storage_dir)
