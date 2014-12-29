@@ -327,8 +327,9 @@ module Bosh::Dev::Sandbox
       @cpi.kill_agents
 
       redis = Redis.new(host: 'localhost', port: redis_port)
+      puts "Resetting resque on redis at #{redis_port}..."
       Resque.redis = redis
-      until resque_is_done
+      until resque_is_done?
         @logger.debug('Waiting for Resque queue to drain')
         sleep 0.1
       end
@@ -345,7 +346,9 @@ module Bosh::Dev::Sandbox
       reconfigure_director if director_configuration_changed?
     end
 
-    def resque_is_done
+    def resque_is_done?
+      puts "Resque redis: #{Resque.redis.inspect}"
+
       info = Resque.info
       info[:pending] == 0 && info[:working] == 0
     end
