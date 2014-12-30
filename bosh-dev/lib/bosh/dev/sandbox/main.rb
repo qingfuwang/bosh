@@ -87,6 +87,7 @@ module Bosh::Dev::Sandbox
       @redis_process = Service.new(%W[redis-server #{sandbox_path(REDIS_CONFIG)}], {}, @logger)
 
       @redis_socket_connector = SocketConnector.new('redis', 'localhost', redis_port, @logger)
+      Bosh::Director::Config.redis_options = {host: 'localhost', port: redis_port}
 
       @nats_log_path = File.join(@logs_path, 'nats.log')
       FileUtils.mkdir_p(@logs_path)
