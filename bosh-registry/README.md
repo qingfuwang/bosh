@@ -80,6 +80,17 @@ These are the credentials to connect to OpenStack services:
 * `connection_options` (optional)
   Hash containing optional connection parameters to the OpenStack API (`ssl_verify_peer`, `omit_default_port`, ...)
 
+#### Azure options
+
+These are the credentials to connect to Azure services:
+
+* `management_endpoint` (required)
+  https://management.core.windows.net or https://management.core.chinacloudapi.cn
+* `subscription_id` (required)
+  Azure Subscriptionid
+* `cert_file` (required)
+  Absolute path to Azure management certificate *.pem or *.pfx
+
 ## Example
 
 This is a sample of an Bosh Registry configuration file:
