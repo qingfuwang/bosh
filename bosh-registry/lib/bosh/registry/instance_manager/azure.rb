@@ -12,13 +12,13 @@ module Bosh::Registry
         @logger = Bosh::Registry.logger
 
         @azure_properties = cloud_config["azure"]
-        Azure.configure do |config|
+        ::Azure.configure do |config|
           config.management_endpoint    = @azure_properties['management_endpoint']
           config.subscription_id        = @azure_properties["subscription_id"]
-          config.cert_file              = @azure_properties["cert_file"]
+          config.management_certificate = @azure_properties["cert_file"]
         end
         
-        @virtual_machine_service = Azure::VirtualMachineManagementService.new
+        @virtual_machine_service = ::Azure::VirtualMachineManagementService.new
       end
 
       def validate_options(cloud_config)
@@ -38,7 +38,7 @@ module Bosh::Registry
         instance = @virtual_machine_service.get_virtual_machine(vm_name, cloud_service_name)
         ips = [instance.ipaddress]
         ips
-      rescue Azure::Core::Error => e
+      rescue ::Azure::Core::Error => e
         raise ConnectionError, "AZURE error: #{e}"
       end
 
