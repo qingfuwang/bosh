@@ -15,7 +15,7 @@ module Bosh::Registry
         ::Azure.configure do |config|
           config.management_endpoint    = @azure_properties['management_endpoint']
           config.subscription_id        = @azure_properties["subscription_id"]
-          config.management_certificate = @azure_properties["cert_file"]
+          config.management_certificate = @azure_properties["management_certificate"]
         end
         
         @virtual_machine_service = ::Azure::VirtualMachineManagementService.new
@@ -26,7 +26,7 @@ module Bosh::Registry
             cloud_config["azure"].is_a?(Hash) &&
             cloud_config["azure"]["management_endpoint"] &&
             cloud_config["azure"]["subscription_id"] &&
-            cloud_config["azure"]["cert_file"]
+            cloud_config["azure"]["management_certificate"]
           raise ConfigError, "Invalid AZURE configuration parameters"
         end
       end
