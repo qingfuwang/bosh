@@ -88,7 +88,7 @@ These are the credentials to connect to Azure services:
   https://management.core.windows.net or https://management.core.chinacloudapi.cn
 * `subscription_id` (required)
   Azure Subscriptionid
-* `cert_file` (required)
+* `management_certificate` (required)
   Absolute path to Azure management certificate *.pem or *.pfx
 
 ## Example
