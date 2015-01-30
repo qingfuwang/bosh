@@ -12,6 +12,8 @@ module Bosh::Stemcell
           Warden.new
         when 'vcloud'
           Vcloud.new
+        when 'azure'
+          Azure.new
         when 'null'
           NullInfrastructure.new
         else
@@ -69,6 +71,12 @@ module Bosh::Stemcell
     class Warden < Base
       def initialize
         super(name: 'warden', hypervisor: 'boshlite', default_disk_size: 2048)
+      end
+    end
+
+    class Azure < Base
+      def initialize
+        super(name: 'azure', hypervisor: 'hyperv', default_disk_size: 3072)
       end
     end
   end

@@ -45,6 +45,8 @@ module Bosh::Stemcell
         vcloud_stages
       when Infrastructure::Warden then
         warden_stages
+      when Infrastructure::Azure then
+        azure_stages
       end
     end
 
@@ -265,6 +267,28 @@ module Bosh::Stemcell
         :image_create,
         # Final stemcell
         :stemcell,
+      ]
+    end
+
+    def azure_stages
+      [
+        # Misc
+        :system_azure_network,
+        :system_azure_modules,
+        :system_azure_wala,
+        :system_parameters,
+        # Finalisation,
+        :bosh_clean,
+        :bosh_harden,
+        :bosh_harden_ssh,
+        :bosh_azure_agent_settings,
+        # Image/bootloader
+        :image_create,
+        :image_install_grub,
+        :image_azure_update_grub,
+        :image_azure_prepare_stemcell,
+        # Final stemcell
+        :stemcell
       ]
     end
   end
