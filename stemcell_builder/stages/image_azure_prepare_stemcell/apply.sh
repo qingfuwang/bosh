@@ -9,7 +9,7 @@ source $base_dir/lib/prelude_apply.bash
 
 # The size of the VHD for Azure must be a whole number in megabytes.
 qemu-img convert -O vpc -o subformat=fixed $work/${stemcell_image_name} $work/root.vhd
-ln $work/root.vhd root.img
+ln $work/root.vhd $work/root.img
 
 pushd $work
 tar zcf stemcell/image root.img
