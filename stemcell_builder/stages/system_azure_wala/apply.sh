@@ -13,6 +13,7 @@ run_in_chroot $chroot "
   curl -L https://github.com/Azure/WALinuxAgent/archive/WALinuxAgent-${wala_release}.tar.gz > /tmp/WALinuxAgent-${wala_release}.tar.gz
   tar -C /tmp -xvf /tmp/WALinuxAgent-${wala_release}.tar.gz
   cd /tmp/WALinuxAgent-WALinuxAgent-${wala_release}
+  chmod +x waagent
   ./waagent -install
 "
 rm -f $chroot/etc/waagent.conf
