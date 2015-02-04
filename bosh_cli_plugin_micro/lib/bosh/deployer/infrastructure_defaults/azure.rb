@@ -25,16 +25,17 @@ module Bosh::Deployer::InfrastructureDefaults
       'plugin' => 'azure',
       'properties' => {
         'azure' => {
-          'subscription_id' => nil,
-          'cert_file' => nil,
           'management_endpoint' => 'https://management.core.windows.net',
+          'subscription_id' => nil,
+          'management_certificate' => nil,
           'storage_account_name' => nil,
           'storage_access_key' => nil,
-          'max_retries' => 2,
-          'ssh_key_file' => nil,
-          'default_security_groups' => [],
+          'container_name' => nil,
           'ssh_user' => 'vcap',
-          'wala_lib_path' => '/var/lib/waagent'
+          'ssh_certificate' => nil,
+          'ssh_private_key' => nil,
+          'wala_lib_path' => '/var/lib/waagent',
+          'default_security_groups' => []
         },
         'registry' => {
           'endpoint' => 'http://admin:admin@localhost:25888',

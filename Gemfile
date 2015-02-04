@@ -16,6 +16,7 @@ source 'https://rubygems.org'
   bosh-registry
   bosh_vsphere_cpi
   bosh_warden_cpi
+  bosh_azure_cpi
   bosh-director
   bosh-director-core
   bosh-monitor
