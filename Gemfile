@@ -4,6 +4,7 @@ source 'https://rubygems.org'
 
 %w(
   agent_client
+  bosh_azure_cpi
   blobstore_client
   bosh_aws_cpi
   bosh_common
@@ -16,7 +17,6 @@ source 'https://rubygems.org'
   bosh-registry
   bosh_vsphere_cpi
   bosh_warden_cpi
-  bosh_azure_cpi
   bosh-director
   bosh-director-core
   bosh-monitor

@@ -23,7 +23,7 @@ Vagrant.configure('2') do |config|
   end
 
   config.vm.define :remote do |remote|
-    remote.vm.box_url = "https://bosh-jenkins-artifacts.s3.amazonaws.com/bosh-vagrant-boxes/#{vm_box}-aws.box"
+    remote.vm.box_url = "file:\/\/\/home\/abelch\/test\/bosh-stemcell-937f30-aws.box"#"https://bosh-jenkins-artifacts.s3.amazonaws.com/bosh-vagrant-boxes/#{vm_box}-aws.box"
     remote.vm.provider :aws do |aws, override|
       aws.instance_type = 'm1.large'
       aws.access_key_id = env.fetch('BOSH_AWS_ACCESS_KEY_ID')
@@ -31,9 +31,11 @@ Vagrant.configure('2') do |config|
       aws.keypair_name = 'bosh'
       aws.security_groups = ['bosh-stemcell']
       aws.tags = { 'Name' => vm_box }
+      aws.region = "us-east-1"
+      aws.ami = "ami-dc5f97b4"
 
       override.ssh.username = 'ubuntu'
-      override.ssh.private_key_path = env.fetch('BOSH_KEY_PATH', '~/.ssh/id_rsa_bosh')
+      override.ssh.private_key_path = env.fetch('BOSH_KEY_PATH', '~/test/cert/bosh_cert.pem')
     end
   end
 
@@ -85,6 +87,7 @@ EOS
         git submodule foreach 'git checkout .'
       )
       chown -R ubuntu:ubuntu /bosh
+      ( apt-get install -y virtualbox cmake pkg-config )
       ( cd /bosh && bundle install --local )
     BASH
   end
