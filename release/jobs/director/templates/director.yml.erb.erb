@@ -378,6 +378,50 @@ cloud:
 
 <% end %>
 
+<% if_p('azure.management_endpoint', 'azure.subscription_id',
+        'azure.management_certificate', 'azure.storage_account_name',
+        'azure.storage_access_key', 'registry.address',
+        'registry.http.port', 'registry.http.user',
+        'registry.http.password') do |management_endpoint, subscription_id,
+                                          management_certificate, storage_account_name,
+                                          storage_access_key, reg_address,
+                                          reg_port, reg_user,
+                                          reg_password| %>
+  plugin: azure <% plugin = "azure" %>
+  properties:
+    azure:
+      management_endpoint: <%= management_endpoint %>
+      subscription_id: <%= subscription_id %>
+      management_certificate: <%= management_certificate.inspect %>
+      storage_account_name: <%= storage_account_name %>
+      storage_access_key: <%= storage_access_key %>
+      <% if_p('azure.container_name') do |container_name| %>
+      container_name: <%= container_name %>
+      <% end %>
+      <% if_p('azure.ssh_user') do |ssh_user| %>
+      ssh_user: <%= ssh_user %>
+      <% end %>
+      <% if_p('azure.ssh_certificate') do |ssh_certificate| %>
+      ssh_certificate: <%= ssh_certificate.inspect %>
+      <% end %>
+      <% if_p('azure.ssh_private_key') do |ssh_private_key| %>
+      ssh_private_key: <%= ssh_private_key.inspect %>
+      <% end %>
+      <% if_p('azure.wala_lib_path') do |wala_lib_path| %>
+      wala_lib_path: <%= wala_lib_path %>
+      <% end %>
+      <% if_p('azure.affinity_group_name') do |affinity_group_name| %>
+      affinity_group_name: <%= affinity_group_name %>
+      <% end %>
+      <% if_p('azure.default_security_groups') do |default_security_groups| %>
+      default_security_groups: <%= default_security_groups %>
+      <% end %>
+    registry:
+      endpoint: http://<%= reg_address %>:<%= reg_port %>
+      user: <%= reg_user %>
+      password: <%= reg_password %>
+<% end %>
+
 <% raise "Could not find cloud plugin" if plugin.nil? && p('external_cpi.enabled', false) == false %>
 
     agent:
