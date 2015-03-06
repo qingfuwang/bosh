@@ -44,6 +44,7 @@ module Bosh::Dev
         bosh-monitor
         bosh-release
         simple_blobstore_server
+        bosh_azure_cpi
       ).each(&block)
     end
 
