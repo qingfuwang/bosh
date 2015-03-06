@@ -31,6 +31,8 @@ Vagrant.configure('2') do |config|
       aws.keypair_name = 'bosh'
       aws.security_groups = ['bosh-stemcell']
       aws.tags = { 'Name' => vm_box }
+      aws.region = "us-east-1"
+      aws.ami = "ami-dc5f97b4"
 
       override.ssh.username = 'ubuntu'
       override.ssh.private_key_path = env.fetch('BOSH_KEY_PATH', '~/.ssh/id_rsa_bosh')

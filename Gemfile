@@ -4,6 +4,7 @@ source 'https://rubygems.org'
 
 %w(
   agent_client
+  bosh_azure_cpi
   blobstore_client
   bosh_aws_cpi
   bosh_common
