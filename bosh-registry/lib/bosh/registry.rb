@@ -13,6 +13,8 @@ require "sequel"
 require "sinatra/base"
 require "thin"
 require "yajl"
+require "azure"
+require "base64"
 
 require "bosh/registry/yaml_helper"
 
