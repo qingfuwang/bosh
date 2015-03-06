@@ -33,4 +33,5 @@ Gem::Specification.new do |s|
   s.add_dependency 'bosh_vsphere_cpi',   "~>#{version}"
   s.add_dependency 'bosh-director-core', "~>#{version}"
   s.add_dependency 'blobstore_client',   "~>#{version}"
+  s.add_dependency 'bosh_azure_cpi',     "~>#{version}"
 end

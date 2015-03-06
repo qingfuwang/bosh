@@ -13,6 +13,7 @@ require 'tmpdir'
 require 'securerandom'
 require 'yaml'
 require 'yajl'
+require 'base64'
 require 'common/common'
 require 'common/thread_formatter'
 
