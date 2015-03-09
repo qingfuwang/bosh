@@ -1,0 +1,43 @@
+name: microbosh-azure
+
+logging:
+  level: debug
+
+network:
+  type: manual
+  vip: <reserved_ip_for_microbosh_vm>
+  ip: 10.0.0.5
+  dns: [10.0.0.4]
+  cloud_properties:
+    virtual_network_name: <virtual_network_name>
+    subnet_name: <subnet_name>
+    tcp_endpoints:
+    - 80:80
+    - 443:443
+    - 6868:6868
+    - 25555:25555
+
+resources:
+  persistent_disk: 20480
+  cloud_properties:
+    instance_type: Small
+
+cloud:
+  plugin: azure
+  properties:
+    azure:
+      management_endpoint: https://management.core.windows.net
+      subscription_id: <your_subscription_id>
+      management_certificate: "<base64_encoding_content_of_your_management_certificate>"
+      storage_account_name: <your_storage_account_name>
+      storage_access_key: <your_storage_access_key>
+      ssh_certificate: "<base64_encoding_content_of_your_ssh_certificate>"
+      ssh_private_key: "<base64_encoding_content_of_your_ssh_private_key>"
+      affinity_group_name: <youre_affinity_group_name>
+
+apply_spec:
+  agent:
+    blobstore: {address: 10.0.0.4}
+    nats:{address: 10.0.0.4}
+  properties:
+    registry:{address: 10.0.0.4}
