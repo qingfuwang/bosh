@@ -89,7 +89,7 @@ These are the credentials to connect to Azure services:
 * `subscription_id` (required)
   Azure Subscriptionid
 * `management_certificate` (required)
-  Base64 encoding content of Azure management certificate *.pem
+  The content of Azure management certificate *.pem
 
 ## Example
 

@@ -392,7 +392,7 @@ cloud:
     azure:
       management_endpoint: <%= management_endpoint %>
       subscription_id: <%= subscription_id %>
-      management_certificate: <%= management_certificate.inspect %>
+      management_certificate: <%= JSON.dump(management_certificate) %>
       storage_account_name: <%= storage_account_name %>
       storage_access_key: <%= storage_access_key %>
       <% if_p('azure.container_name') do |container_name| %>
@@ -402,10 +402,10 @@ cloud:
       ssh_user: <%= ssh_user %>
       <% end %>
       <% if_p('azure.ssh_certificate') do |ssh_certificate| %>
-      ssh_certificate: <%= ssh_certificate.inspect %>
+      ssh_certificate: <%= JSON.dump(ssh_certificate) %>
       <% end %>
       <% if_p('azure.ssh_private_key') do |ssh_private_key| %>
-      ssh_private_key: <%= ssh_private_key.inspect %>
+      ssh_private_key: <%= JSON.dump(ssh_private_key) %>
       <% end %>
       <% if_p('azure.wala_lib_path') do |wala_lib_path| %>
       wala_lib_path: <%= wala_lib_path %>

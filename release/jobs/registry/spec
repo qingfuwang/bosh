@@ -87,4 +87,4 @@ properties:
   azure.subscription_id:
     description: Azure Subscription Id
   azure.management_certificate:
-    description: Base64 encoding content of Azure API certificates used to authenticate service management operations
+    description: The content of Azure API certificates used to authenticate service management operations

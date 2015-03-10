@@ -104,7 +104,7 @@ module Bosh::Deployer
         err 'Missing properties.azure.ssh_private_key' unless key
 
         ssh_key = "/tmp/bosh_private_key"
-        File.open(ssh_key, 'w+') { |f| f.write(Base64.decode64(key)) }
+        File.open(ssh_key, 'w+') { |f| f.write(key) }
 
         [ssh_key, ssh_port, ssh_user, ssh_wait]
       end

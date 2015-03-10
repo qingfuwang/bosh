@@ -45,8 +45,10 @@ module Bosh::AzureCloud
     #               specific to a CPI
     # @return [String] opaque id later used by {#create_vm} and {#delete_stemcell}
     def create_stemcell(image_path, cloud_properties)
-      stemcell_id = @stemcell_manager.create_stemcell(image_path, cloud_properties)
-      stemcell_id
+      with_thread_name("create_stemcell(#{image_path}...)") do
+        stemcell_id = @stemcell_manager.create_stemcell(image_path, cloud_properties)
+        stemcell_id
+      end
     end
 
     ##
@@ -55,7 +57,9 @@ module Bosh::AzureCloud
     # @param [String] stemcell_id stemcell id that was once returned by {#create_stemcell}
     # @return [void]
     def delete_stemcell(stemcell_id)
-      @stemcell_manager.delete_image(stemcell_id)
+      with_thread_name("delete_stemcell(#{stemcell_id})") do
+        @stemcell_manager.delete_image(stemcell_id)
+      end
     end
 
     ##
@@ -341,13 +345,13 @@ module Bosh::AzureCloud
 
     def init_azure
       @azure_certificate_file = "/tmp/azure.pem"
-      File.open(@azure_certificate_file, 'w+') { |f| f.write(Base64.decode64(azure_properties['management_certificate'])) }
+      File.open(@azure_certificate_file, 'w+') { |f| f.write(azure_properties['management_certificate']) }
 
       @ssh_certificate_file = "/tmp/bosh_cert.pem"
-      File.open(@ssh_certificate_file, 'w+') { |f| f.write(Base64.decode64(azure_properties['ssh_certificate'])) }
+      File.open(@ssh_certificate_file, 'w+') { |f| f.write(azure_properties['ssh_certificate']) }
 
       @ssh_private_key_file = "/tmp/bosh_private_key"
-      File.open(@ssh_private_key_file, 'w+') { |f| f.write(Base64.decode64(azure_properties['ssh_private_key'])) }
+      File.open(@ssh_private_key_file, 'w+') { |f| f.write(azure_properties['ssh_private_key']) }
 
       Azure::Core::Utility.initialize_external_logger(@logger)
       Azure.configure do |config|

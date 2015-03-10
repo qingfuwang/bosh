@@ -64,6 +64,6 @@ cloud:
   azure:
     management_endpoint: <%= management_endpoint %>
     subscription_id: <%= subscription_id %>
-    management_certificate: <%= management_certificate.inspect %>
+    management_certificate: <%= JSON.dump(management_certificate) %>
 <% end %>
 <% raise 'Could not find cloud plugin' if plugin.nil? %>

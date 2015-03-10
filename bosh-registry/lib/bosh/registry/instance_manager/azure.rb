@@ -13,7 +13,7 @@ module Bosh::Registry
 
         @azure_properties = cloud_config["azure"]
         @azure_certificate_file = "/tmp/azure.pem"
-        File.open(@azure_certificate_file, 'w+') { |f| f.write(Base64.decode64(@azure_properties['management_certificate'])) }
+        File.open(@azure_certificate_file, 'w+') { |f| f.write(@azure_properties['management_certificate']) }
 
         ::Azure.configure do |config|
           config.management_endpoint    = @azure_properties['management_endpoint']
