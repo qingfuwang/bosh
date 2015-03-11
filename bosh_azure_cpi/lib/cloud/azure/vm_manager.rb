@@ -53,6 +53,7 @@ module Bosh::AzureCloud
       end
 
       opts[:tcp_endpoints] = network_configurator.tcp_endpoints
+      opts[:udp_endpoints] = network_configurator.udp_endpoints
 
       params[:custom_data] = get_user_data(params[:vm_name], network_configurator.dns)
 
@@ -60,6 +61,7 @@ module Bosh::AzureCloud
       logger.debug("opts: #{opts}")
       result = @azure_vm_service.create_virtual_machine(params, opts)
       if result.is_a? String
+        logger.error("Failed to create vm: #{result}")
         @azure_cloud_service.delete_cloud_service(opts[:cloud_service_name]) if @azure_cloud_service.get_cloud_service(opts[:cloud_service_name])
         cloud_error("Failed to create vm: #{result}")
       end

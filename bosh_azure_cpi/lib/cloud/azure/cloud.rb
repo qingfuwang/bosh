@@ -173,7 +173,7 @@ module Bosh::AzureCloud
     # @param [Optional, Hash] options CPI specific options (e.g hard/soft reboot)
     # @return [void]
     def reboot_vm(instance_id, options=nil)
-      with_thread_name("reboot_vm?(#{instance_id})") do
+      with_thread_name("reboot_vm(#{instance_id})") do
         @instance_manager.reboot(instance_id)
       end
     end
@@ -215,7 +215,7 @@ module Bosh::AzureCloud
     #                           be attached to
     # @return [String] opaque id later used by {#attach_disk}, {#detach_disk}, and {#delete_disk}
     def create_disk(size, cloud_properties, instance_id = nil)
-      with_thread_name("create_disk?(#{size})") do
+      with_thread_name("create_disk(#{size})") do
         logger.info("Create disk for vm #{instance_id}") unless instance_id.nil?
         validate_disk_size(size)
         
@@ -237,7 +237,7 @@ module Bosh::AzureCloud
     # @param [String] disk_id disk id that was once returned by {#create_disk}
     # @return [void]
     def delete_disk(disk_id)
-      with_thread_name("delete_disk?(#{disk_id})") do
+      with_thread_name("delete_disk(#{disk_id})") do
         @disk_manager.delete_disk(disk_id)
       end
     end
@@ -247,7 +247,7 @@ module Bosh::AzureCloud
     # @param [String] disk_id disk id that was once returned by {#create_disk}
     # @return [void]
     def attach_disk(instance_id, disk_id)
-      with_thread_name("attach_disk?(#{instance_id},#{disk_id})") do
+      with_thread_name("attach_disk(#{instance_id},#{disk_id})") do
         volume_name = @instance_manager.attach_disk(instance_id, disk_id)
 
         update_agent_settings(instance_id) do |settings|
@@ -265,7 +265,7 @@ module Bosh::AzureCloud
     # @param [Hash] metadata metadata key/value pairs
     # @return [String] snapshot id
     def snapshot_disk(disk_id, metadata={})
-      with_thread_name("snapshot_disk?(#{disk_id},#{metadata})") do
+      with_thread_name("snapshot_disk(#{disk_id},#{metadata})") do
         snapshot_id = @disk_manager.snapshot_disk(disk_id, metadata)
 
         logger.info("Take a snapshot disk `#{snapshot_id}' for `#{disk_id}'")
@@ -276,7 +276,7 @@ module Bosh::AzureCloud
     # @param [String] snapshot_id snapshot id to delete
     # @return [void]
     def delete_snapshot(snapshot_id)
-      with_thread_name("delete_snapshot?(#{snapshot_id})") do
+      with_thread_name("delete_snapshot(#{snapshot_id})") do
         @disk_manager.delete_disk(snapshot_id)
       end
     end
@@ -286,7 +286,7 @@ module Bosh::AzureCloud
     # @param [String] disk_id disk id that was once returned by {#create_disk}
     # @return [void]
     def detach_disk(instance_id, disk_id)
-      with_thread_name("detach_disk?(#{instance_id},#{disk_id})") do
+      with_thread_name("detach_disk(#{instance_id},#{disk_id})") do
 
         update_agent_settings(instance_id) do |settings|
           settings["disks"] ||= {}
@@ -305,7 +305,7 @@ module Bosh::AzureCloud
     # @return [array[String]] list of opaque disk_ids that can be used with the
     # other disk-related methods on the CPI
     def get_disks(instance_id)
-      with_thread_name("get_disks?(#{instance_id})") do
+      with_thread_name("get_disks(#{instance_id})") do
         @instance_manager.get_disks(instance_id)
       end
     end

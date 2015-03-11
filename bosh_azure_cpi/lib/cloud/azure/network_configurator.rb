@@ -69,11 +69,11 @@ module Bosh::AzureCloud
     def vnet?
       @network.is_a? ManualNetwork
     end
-    
+
     def reserved_ip
       @vip_network.reserved_ip unless @vip_network.nil?
     end
-    
+
     def tcp_endpoints
       endpoints = ''
       result = parse_endpoints(@network.cloud_properties['tcp_endpoints']) || []
@@ -86,21 +86,34 @@ module Bosh::AzureCloud
       end
       endpoints
     end
-    
+
     def dns
       @network.spec['dns'] if @network.spec.has_key? "dns"
     end
-    
+
+    def udp_endpoints
+      endpoints = ''
+      result = parse_endpoints(@network.cloud_properties['udp_endpoints']) || []
+      result.each do |endpoint|
+        if endpoints.empty?
+          endpoints = "#{endpoint}"
+        else
+          endpoints = "#{endpoints}, #{endpoint}"
+        end
+      end
+      endpoints
+    end
+
     private
 
     def parse_endpoints(endpoints)
       return nil if (endpoints.nil?)
-      raise ArgumentError, "Invalid 'tcp_endpoints', Array expected, " \
+      raise ArgumentError, "Invalid 'endpoints', Array expected, " \
                            "#{spec.class} provided" unless endpoints.is_a?(Array)
 
       endpoint_list = []
       endpoints.each do |endpoint|
-        raise "Invalid tcp endpoint '#{endpoint}' given. Format is 'X:Y' where 'X' " \
+        raise "Invalid endpoint '#{endpoint}' given. Format is 'X:Y' where 'X' " \
               "is an internal-facing port between 1 and 65535 and 'Y' is an external-facing " \
               'port in the same range' if !valid_endpoint?(endpoint)
         endpoint_list << endpoint
