@@ -11,5 +11,5 @@ source $base_dir/lib/prelude_apply.bash
 qemu-img convert -O vpc -o subformat=fixed $work/${stemcell_image_name} $work/root.vhd
 
 pushd $work
-cp $work/root.vhd stemcell/image
+tar zcf stemcell/image root.vhd
 popd

@@ -1,4 +1,3 @@
-
 module Bosh::AzureCloud
   class StemcellManager
     IMAGE_FAMILY = 'bosh'
@@ -59,10 +58,11 @@ module Bosh::AzureCloud
     end
 
     def create_stemcell(image_path, cloud_properties)
-      stemcell_name = "bosh-image-#{SecureRandom.uuid}"
-      
+      vhd_path = extract_image(image_path)
+
       logger.info("Start to upload VHD")
-      @blob_manager.create_page_blob(container_name, image_path, "#{stemcell_name}.vhd")
+      stemcell_name = "bosh-image-#{SecureRandom.uuid}"
+      @blob_manager.create_page_blob(container_name, vhd_path, "#{stemcell_name}.vhd")
       
       begin
         logger.info("Start to create an image with the uploaded VHD")
@@ -85,5 +85,18 @@ module Bosh::AzureCloud
     end
 
     private
+    def extract_image(image_path)
+      logger.info("Unpacking image: #{image_path}")
+      tmp_dir = Dir.mktmpdir('sc-')
+      run_command("tar -zxf #{image_path} -C #{tmp_dir}")
+      "#{tmp_dir}/root.vhd"
+    end
+
+    def run_command(command)
+      output, status = Open3.capture2e(command)
+      if status.exitstatus != 0
+        cloud_error("'#{command}' failed with exit status=#{status.exitstatus} [#{output}]")
+      end
+    end
   end
 end

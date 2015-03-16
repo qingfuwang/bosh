@@ -19,6 +19,7 @@ require 'time'
 require 'socket'
 require 'vhd'
 require 'thread'
+require 'open3'
 
 require 'common/exec'
 require 'common/thread_pool'
