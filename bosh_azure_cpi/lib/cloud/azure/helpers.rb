@@ -95,24 +95,24 @@ module Bosh::AzureCloud
     def wait_for_completion(response)
       ret_val = Nokogiri::XML response.body
       if ret_val.at_css('Error Code') && ret_val.at_css('Error Code').content == 'AuthenticationFailed'
-        cloud_error(ret_val.at_css('Error Code').content + ' : ' + ret_val.at_css('Error Message').content)
+        raise Bosh::Clouds::CloudError, (ret_val.at_css('Error Code').content + ' : ' + ret_val.at_css('Error Message').content)
       end
       if response.code.to_i == 200 || response.code.to_i == 201
         return response
       elsif response.code.to_i == 307
         #rebuild_request response
-        cloud_error("Currently bosh_azure_cpi does not support proxy.")
+        raise Bosh::Clouds::CloudError, "Currently bosh_azure_cpi does not support proxy."
       elsif response.code.to_i > 201 && response.code.to_i <= 299
         check_completion(response['x-ms-request-id'])
       elsif warn && !response.success?
       elsif response.body
         if ret_val.at_css('Error Code') && ret_val.at_css('Error Message')
-          cloud_error(ret_val.at_css('Error Code').content + ' : ' + ret_val.at_css('Error Message').content)
+          raise Bosh::Clouds::CloudError, (ret_val.at_css('Error Code').content + ' : ' + ret_val.at_css('Error Message').content)
         else
-          cloud_error(nil, "http error: #{response.code}")
+          raise Bosh::Clouds::CloudError, "http error: #{response.code}"
         end
       else
-        cloud_error(nil, "http error: #{response.code}")
+        raise Bosh::Clouds::CloudError, "http error: #{response.code}"
       end
     end
     
@@ -135,7 +135,7 @@ module Bosh::AzureCloud
           if status.downcase != 'succeeded'
             error_code = xml_content(ret_val, 'Operation Error Code')
             error_msg = xml_content(ret_val, 'Operation Error Message')
-            cloud_error(nil, "#{error_code}: #{error_msg}")
+            raise Bosh::Clouds::CloudError, "#{error_code}: #{error_msg}"
           else
             puts "#{status.downcase} (#{status_code})"
           end

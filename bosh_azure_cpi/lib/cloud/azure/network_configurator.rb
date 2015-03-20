@@ -62,12 +62,12 @@ module Bosh::AzureCloud
       @network.subnet_name
     end
 
-    def private_ip
-      vnet? ? @network.private_ip : nil
+    def vnet?
+      @network.vnet?
     end
 
-    def vnet?
-      @network.is_a? ManualNetwork
+    def private_ip
+      (@network.is_a? ManualNetwork) ? @network.private_ip : nil
     end
 
     def reserved_ip
@@ -76,14 +76,17 @@ module Bosh::AzureCloud
 
     def tcp_endpoints
       endpoints = ''
-      result = parse_endpoints(@network.cloud_properties['tcp_endpoints']) || []
-      result.each do |endpoint|
-        if endpoints.empty?
-          endpoints = "#{endpoint}"
-        else
-          endpoints = "#{endpoints}, #{endpoint}"
+      unless @network.cloud_properties.nil?
+        result = parse_endpoints(@network.cloud_properties['tcp_endpoints']) || []
+        result.each do |endpoint|
+          if endpoints.empty?
+            endpoints = "#{endpoint}"
+          else
+            endpoints = "#{endpoints}, #{endpoint}"
+          end
         end
       end
+
       endpoints
     end
 
@@ -93,14 +96,17 @@ module Bosh::AzureCloud
 
     def udp_endpoints
       endpoints = ''
-      result = parse_endpoints(@network.cloud_properties['udp_endpoints']) || []
-      result.each do |endpoint|
-        if endpoints.empty?
-          endpoints = "#{endpoint}"
-        else
-          endpoints = "#{endpoints}, #{endpoint}"
+      unless @network.cloud_properties.nil?
+        result = parse_endpoints(@network.cloud_properties['udp_endpoints']) || []
+        result.each do |endpoint|
+          if endpoints.empty?
+            endpoints = "#{endpoint}"
+          else
+            endpoints = "#{endpoints}, #{endpoint}"
+          end
         end
       end
+
       endpoints
     end
 

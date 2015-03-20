@@ -18,6 +18,7 @@ module Bosh::AzureCloud
     end
 
     def create(uuid, stemcell, cloud_opts, network_configurator, resource_pool)
+      logger.info("create(#{uuid}, #{stemcell}...)")
       params = {
           :vm_name             => "bosh-vm-#{uuid}",
           :vm_user             => cloud_opts['ssh_user'],
@@ -28,7 +29,7 @@ module Bosh::AzureCloud
       opts = {
           :cloud_service_name   => "bosh-service-#{uuid}",
           :storage_account_name => @storage_manager.get_storage_account_name,
-          :vm_size              => resource_pool['instance_type'],
+          :vm_size              => resource_pool['instance_type'] || 'Small',
           :certificate_file     => cloud_opts['ssh_certificate_file'],
           :private_key_file     => cloud_opts['ssh_private_key_file']
       }
@@ -47,9 +48,12 @@ module Bosh::AzureCloud
       end
 
       if (network_configurator.vnet?)
-        opts[:virtual_network_name]             = network_configurator.virtual_network_name
-        opts[:subnet_name]                      = network_configurator.subnet_name
-        opts[:static_virtual_network_ipaddress] = network_configurator.private_ip
+        opts[:virtual_network_name] = network_configurator.virtual_network_name
+        opts[:subnet_name]          = network_configurator.subnet_name
+
+        unless network_configurator.private_ip.nil?
+          opts[:static_virtual_network_ipaddress] = network_configurator.private_ip
+        end
       end
 
       opts[:tcp_endpoints] = network_configurator.tcp_endpoints
@@ -59,42 +63,92 @@ module Bosh::AzureCloud
 
       logger.debug("params: #{params}")
       logger.debug("opts: #{opts}")
-      result = @azure_vm_service.create_virtual_machine(params, opts)
+
+      max_retry = 10
+
+      begin
+        retry_interval = 0
+        result = @azure_vm_service.create_virtual_machine(params, opts)
+
+        if result.is_a? String
+          if result.include?("ConflictError")
+            retry_interval = 6
+            max_retry -= 1
+          elsif e.message.include?("TooManyRequests")
+            retry_interval = 15
+            max_retry -= 1
+          end
+          if retry_interval != 0 && max_retry > 0
+              raise "retry to create(#{uuid})"
+          end
+        end
+      rescue => e
+        sleep(retry_interval)
+        logger.warn(e.message)
+        retry
+      end
+
       if result.is_a? String
         logger.error("Failed to create vm: #{result}")
         @azure_cloud_service.delete_cloud_service(opts[:cloud_service_name]) if @azure_cloud_service.get_cloud_service(opts[:cloud_service_name])
-        cloud_error("Failed to create vm: #{result}")
+        cloud_error("vm_manager.create: #{result}")
       end
 
       result
     end
 
     def find(instance_id)
+      logger.debug("find(#{instance_id})")
       cloud_service_name, vm_name = parse_instance_id(instance_id)
       @azure_vm_service.get_virtual_machine(vm_name, cloud_service_name)
     end
 
     def delete(instance_id)
+      logger.debug("delete(#{instance_id})")
       cloud_service_name, vm_name = parse_instance_id(instance_id)
-      @azure_vm_service.delete_virtual_machine(vm_name, cloud_service_name)
+      max_retry = 10
+
+      begin
+        retry_interval = 0
+        handle_response http_delete("services/hostedservices/#{cloud_service_name}?comp=media")
+      rescue => e
+        if e.message.include?("ConflictError")
+          retry_interval = 6
+          max_retry -= 1
+        elsif e.message.include?("TooManyRequests")
+          retry_interval = 15
+          max_retry -= 1
+        end
+
+        if retry_interval != 0 && max_retry > 0
+          sleep(retry_interval)
+          logger.info("retry to delete(#{instance_id})")
+          retry
+        end
+        logger.warn("delete(#{instance_id}): #{e.message}\n#{e.backtrace.join("\n")}")
+      end
     end
 
     def reboot(instance_id)
+      logger.debug("reboot(#{instance_id})")
       cloud_service_name, vm_name = parse_instance_id(instance_id)
       @azure_vm_service.restart_virtual_machine(vm_name, cloud_service_name)
     end
 
     def start(instance_id)
+      logger.debug("start(#{instance_id})")
       cloud_service_name, vm_name = parse_instance_id(instance_id)
       @azure_vm_service.start_virtual_machine(vm_name, cloud_service_name)
     end
 
     def shutdown(instance_id)
+      logger.debug("shutdown(#{instance_id})")
       cloud_service_name, vm_name = parse_instance_id(instance_id)
       @azure_vm_service.shutdown_virtual_machine(vm_name, cloud_service_name)
     end
 
     def instance_id(wala_lib_path)
+      logger.debug("instance_id(#{wala_lib_path})")
       contents = File.open(wala_lib_path + "/SharedConfig.xml", "r"){ |file| file.read }
 
       service_name = contents.match("^*<Service name=\"(.*)\" guid=\"{[-0-9a-fA-F]+}\"[\\s]*/>")[1]
@@ -110,23 +164,33 @@ module Bosh::AzureCloud
     # @param [String] disk_name disk name
     # @return [String] volume name. "/dev/sd[c-r]"
     def attach_disk(instance_id, disk_name)
+      logger.debug("attach_disk(#{instance_id}, #{disk_name})")
       vm = find(instance_id) || cloud_error('Given instance id does not exist')
-      
+
       cloud_service_name, vm_name = parse_instance_id(instance_id)
-      
+
+      next_disk_lun = vm.data_disks.size
       options = {
           :import => true,
           :disk_name => disk_name,
           :host_caching => 'ReadOnly',
           :disk_label => 'bosh',
-          :lun => get_next_disk_lun(vm)
+          :lun => next_disk_lun
       }
       @azure_vm_service.add_data_disk(vm_name, cloud_service_name, options)
-      
+
+      disks_size = next_disk_lun
+      until disks_size > next_disk_lun do
+        sleep(5)
+        vm = find(instance_id)
+        disks_size = vm.data_disks.size
+      end
+
       get_volume_name(instance_id, disk_name)
     end
     
     def detach_disk(instance_id, disk_name)
+      logger.debug("detach_disk(#{instance_id}, #{disk_name})")
       vm = find(instance_id) || cloud_error('Given instance id does not exist')
       
       cloud_service_name, vm_name = parse_instance_id(instance_id)
@@ -135,11 +199,40 @@ module Bosh::AzureCloud
       data_disk || cloud_error('Given disk name is not attached to given instance id')
       
       lun = get_disk_lun(data_disk)
-      http_delete("services/hostedservices/#{cloud_service_name}/deployments/#{vm.deployment_name}/"\
+      max_retry = 10
+
+      begin
+        retry_interval = 0
+        handle_response http_delete("services/hostedservices/#{cloud_service_name}/deployments/#{vm.deployment_name}/"\
                              "roles/#{vm_name}/DataDisks/#{lun}")
+      rescue => e
+        if e.message.include?("ConflictError")
+          retry_interval = 6
+          max_retry -= 1
+        elsif e.message.include?("TooManyRequests")
+          retry_interval = 15
+          max_retry -= 1
+        end
+
+        if retry_interval != 0 && max_retry > 0
+          sleep(retry_interval)
+          logger.info("retry to delete(#{instance_id})")
+          retry
+        end
+        logger.warn("delete(#{instance_id}): #{e.message}\n#{e.backtrace.join("\n")}")
+      end
+
+      current_disks_size = vm.data_disks.size
+      disks_size = current_disks_size
+      until disks_size < current_disks_size do
+        sleep(5)
+        vm = find(instance_id)
+        disks_size = vm.data_disks.size
+      end
     end
     
     def get_disks(instance_id)
+      logger.debug("get_disks(#{instance_id})")
       vm = find(instance_id) || cloud_error('Given instance id does not exist')
       
       data_disks = []
@@ -173,10 +266,6 @@ module Bosh::AzureCloud
     
     def get_disk_lun(data_disk)
       data_disk[:lun] != "" ? data_disk[:lun].to_i : 0
-    end
-    
-    def get_next_disk_lun(vm)
-      vm.data_disks.size
     end
   end
 end

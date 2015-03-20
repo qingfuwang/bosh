@@ -55,6 +55,8 @@ module Bosh::AzureCloud
         end
       end
       os_images
+    rescue => e
+      cloud_error("Failed to list stemcells: #{e.message}\n#{e.backtrace.join("\n")}")
     end
 
     def create_stemcell(image_path, cloud_properties)
