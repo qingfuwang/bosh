@@ -74,7 +74,7 @@ module Bosh::AzureCloud
           if result.include?("ConflictError")
             retry_interval = 6
             max_retry -= 1
-          elsif e.message.include?("TooManyRequests")
+          elsif result.include?("TooManyRequests")
             retry_interval = 15
             max_retry -= 1
           end
