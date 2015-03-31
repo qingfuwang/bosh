@@ -135,18 +135,6 @@ module Bosh::AzureCloud
       @azure_vm_service.restart_virtual_machine(vm_name, cloud_service_name)
     end
 
-    def start(instance_id)
-      logger.debug("start(#{instance_id})")
-      cloud_service_name, vm_name = parse_instance_id(instance_id)
-      @azure_vm_service.start_virtual_machine(vm_name, cloud_service_name)
-    end
-
-    def shutdown(instance_id)
-      logger.debug("shutdown(#{instance_id})")
-      cloud_service_name, vm_name = parse_instance_id(instance_id)
-      @azure_vm_service.shutdown_virtual_machine(vm_name, cloud_service_name)
-    end
-
     def instance_id(wala_lib_path)
       logger.debug("instance_id(#{wala_lib_path})")
       contents = File.open(wala_lib_path + "/SharedConfig.xml", "r"){ |file| file.read }

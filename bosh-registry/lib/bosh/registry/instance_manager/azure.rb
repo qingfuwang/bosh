@@ -39,7 +39,7 @@ module Bosh::Registry
       def instance_ips(instance_id)
         cloud_service_name, vm_name = instance_id.split("&")
         instance = @virtual_machine_service.get_virtual_machine(vm_name, cloud_service_name)
-        ips = [instance.ipaddress]
+        ips = [instance.dipaddress, instance.ipaddress]
         ips
       rescue ::Azure::Core::Error => e
         raise ConnectionError, "AZURE error: #{e}"
