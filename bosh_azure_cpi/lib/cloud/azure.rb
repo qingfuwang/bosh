@@ -32,6 +32,7 @@ require 'cloud'
 require 'cloud/azure/helpers'
 require 'cloud/azure/cloud'
 require 'cloud/azure/version'
+require 'cloud/azure/azure_client'
 
 require 'cloud/azure/affinity_group_manager'
 require 'cloud/azure/network'

@@ -1,6 +1,9 @@
 module Bosh::AzureCloud
   module Helpers
 
+    MAX_RETRIES = 10 # Max number of retries
+    DEFAULT_RETRY_TIMEOUT = 15 # Default timeout before retrying a call (in seconds)
+
     def generate_instance_id(cloud_service_name, vm_name)
       instance_id = cloud_service_name + "&" + vm_name
     end
@@ -15,7 +18,7 @@ module Bosh::AzureCloud
         h
       end
     end
-    
+
     ##
     # Raises CloudError exception
     #
@@ -26,7 +29,7 @@ module Bosh::AzureCloud
       @logger.error(exception) if @logger && exception
       raise Bosh::Clouds::CloudError, message
     end
-    
+
     def xml_content(xml, key, default = '')
       content = default
       node = xml.at_css(key)
@@ -48,7 +51,7 @@ module Bosh::AzureCloud
       ret = wait_for_completion(response)
       Nokogiri::XML(ret.body) unless ret.nil?
     end
-    
+
     def init_url(uri)
       "#{Azure.config.management_endpoint}/#{Azure.config.subscription_id}/#{uri}"
     end
@@ -91,7 +94,7 @@ module Bosh::AzureCloud
       http.verify_mode = OpenSSL::SSL::VERIFY_PEER
       http
     end
-    
+
     def wait_for_completion(response)
       ret_val = Nokogiri::XML response.body
       if ret_val.at_css('Error Code') && ret_val.at_css('Error Code').content == 'AuthenticationFailed'
@@ -115,12 +118,12 @@ module Bosh::AzureCloud
         raise Bosh::Clouds::CloudError, "http error: #{response.code}"
       end
     end
-    
+
     def check_completion(request_id)
       request_path = "/operations/#{request_id}"
       done = false
       while not done
-        puts '# '
+        print '# '
         response = http_get(request_path)
         ret_val = Nokogiri::XML response.body
         status = xml_content(ret_val, 'Operation Status')
@@ -144,6 +147,30 @@ module Bosh::AzureCloud
           sleep(5)
         end
       end
+    end
+
+    def retry_azure_operation
+      retries = 0
+      retry_interval = DEFAULT_RETRY_TIMEOUT
+
+      begin
+        yield
+      rescue => e
+        if e.message.include?("ConflictError") || e.message.include?("TooManyRequests") || e.message.include?("Retry")
+          unless retries >= MAX_RETRIES
+            task_checkpoint
+            sleep(retry_interval)
+            retries += 1
+            @logger.info("retry #{retries} time")
+            retry
+          end
+        end
+        @logger.warn("#{e.message}\n#{e.backtrace.join("\n")}")
+      end
+    end
+
+    def task_checkpoint
+      Bosh::Clouds::Config.task_checkpoint
     end
   end
 end

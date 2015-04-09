@@ -78,7 +78,7 @@ module Bosh::Deployer
       # @return [Integer] size in MiB
       def disk_size(cid)
         # AZURE stores disk size in GiB but the CPI uses MiB
-        disk = instance_manager.cloud.azure.find(instance_manager.state.vm_cid).data_disks.select { |x| x.disk_name == cid }
+        disk = instance_manager.cloud.azure.vm_manager.find(instance_manager.state.vm_cid).data_disks.select { |x| x.disk_name == cid }
         disk.first.size_in_gb * 1024
       end
 
@@ -111,7 +111,7 @@ module Bosh::Deployer
 
       def discover_client_services_ip
         if instance_manager.state.vm_cid
-          instance = instance_manager.cloud.azure.find(instance_manager.state.vm_cid)
+          instance = instance_manager.cloud.azure.vm_manager.find(instance_manager.state.vm_cid)
           ip = instance.ipaddress
 
           if ip
