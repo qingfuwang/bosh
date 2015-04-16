@@ -12,10 +12,15 @@ network:
     virtual_network_name: <virtual_network_name>
     subnet_name: <subnet_name>
     tcp_endpoints:
-    - 80:80
-    - 443:443
-    - 6868:6868
-    - 25555:25555
+    - "53:53"
+    - "4222:4222"
+    - "6868:6868"
+    - "25250:25250"
+    - "25555:25555"
+    - "25777:25777"
+    udp_endpoints:
+    - "53:53"
+    - "68:68"
 
 resources:
   persistent_disk: 20480

@@ -35,7 +35,7 @@ module Bat
     end
 
     def supports_network_reconfiguration?
-      !(name =~ /vsphere/ && (name =~ /centos/ || name !~ /go_agent/)) && name !~ /vcloud/ && name !~ /warden/
+      !(name =~ /vsphere/ && (name =~ /centos/ || name !~ /go_agent/)) && name !~ /vcloud/ && name !~ /warden/ && name !~ /azure/
     end
 
     def supports_changing_static_ip?(network_type)
