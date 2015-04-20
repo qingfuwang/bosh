@@ -18,7 +18,6 @@ module Bosh::AzureCloud
     end
 
     def container_exist?(container_name)
-      puts(@blob_service_client.host)
       @blob_service_client.list_containers.each do |container|
         return true if (container.name.eql?(container_name))
       end

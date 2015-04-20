@@ -111,7 +111,7 @@ var NatRule = {
     }
 }
 var NatRuleRef = {
-    "id":"/subscriptions/4be8XXX1d05/resourceGroups/qingfu3/providers/Microsoft.Network/loadBalancers/bosh-XXXbm-e6956d09-2dcd-4647-8efd-253448759621/backendAddressPools/LBBE"
+    "id":""
 }
 
 var formatParameter = function(templatefile, paramters) {
