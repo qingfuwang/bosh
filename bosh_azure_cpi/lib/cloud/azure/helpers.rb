@@ -1,9 +1,6 @@
 module Bosh::AzureCloud
   module Helpers
 
-    MAX_RETRIES = 10 # Max number of retries
-    DEFAULT_RETRY_TIMEOUT = 15 # Default timeout before retrying a call (in seconds)
-
     def generate_instance_id(cloud_service_name, vm_name)
       instance_id = cloud_service_name + "&" + vm_name
     end
@@ -18,7 +15,7 @@ module Bosh::AzureCloud
         h
       end
     end
-
+    
     ##
     # Raises CloudError exception
     #
@@ -29,13 +26,67 @@ module Bosh::AzureCloud
       @logger.error(exception) if @logger && exception
       raise Bosh::Clouds::CloudError, message
     end
-
+    
     def xml_content(xml, key, default = '')
       content = default
       node = xml.at_css(key)
       content = node.text if node
       content
     end
+
+   
+    def invoke_auzre_js(args,logger,abort_on_error=true)
+      node_js_file = File.join(File.dirname(__FILE__),"azure_crp","azure_crp_compute.js")
+      cmd = "node #{node_js_file}".split(" ")
+      cmd.concat(args)
+      result  = {};
+      Open3.popen3(*cmd) {
+      |stdin, stdout, stderr, wait_thr|
+
+            data = ""
+            stdstr=""
+            begin
+                while wait_thr.alive? do
+                    IO.select([stdout])
+                    data = stdout.read_nonblock(1024000)
+                    logger.info(data)
+                    stdstr+=data;
+                end
+                rescue Errno::EAGAIN
+                retry
+                rescue EOFError
+            end
+
+            errstr = stderr.read;
+            stdstr+=stdout.read
+            if errstr
+                logger.warn(errstr);
+            end
+            matchdata = stdstr.match(/##RESULTBEGIN##(.*)##RESULTEND##/im)
+            result = JSON(matchdata.captures[0]) if  matchdata
+            exitcode = wait_thr.value
+            logger.debug(result)
+            #cloud_error("command execute failed ,abort :"+args) if exitcode==1 and abort_on_error
+            return nil if result["Failed"];
+            return result["R"]
+      }
+    end
+
+    def invoke_auzre_js_with_id(arg,logger)
+        task =arg[0]
+        id = arg[1]
+        logger.info("invoke azure js "+task)
+        begin
+           #(__bosh-qingfu3-bm-0458d6c4-6534-4724-81f1-d71e50df778fService&_bosh-qingfu3-bm-0458d6c4-6534-4724-81f1-d71e50df778f
+            resource_group_name = id.split('&')[0][7..-48]
+            puts("resource_group_name is" +resource_group_name)
+            return invoke_auzre_js(["-t",task,"-r",resource_group_name,id.split('&')[1][1..-1]].concat(arg[2..-1]),logger)
+        rescue Exception => ex
+            puts("error:"+ex.message+ex.backtrace.join("\n"))
+        end
+    end
+
+
 
     private
 
@@ -51,7 +102,7 @@ module Bosh::AzureCloud
       ret = wait_for_completion(response)
       Nokogiri::XML(ret.body) unless ret.nil?
     end
-
+    
     def init_url(uri)
       "#{Azure.config.management_endpoint}/#{Azure.config.subscription_id}/#{uri}"
     end
@@ -94,36 +145,36 @@ module Bosh::AzureCloud
       http.verify_mode = OpenSSL::SSL::VERIFY_PEER
       http
     end
-
+    
     def wait_for_completion(response)
       ret_val = Nokogiri::XML response.body
       if ret_val.at_css('Error Code') && ret_val.at_css('Error Code').content == 'AuthenticationFailed'
-        raise Bosh::Clouds::CloudError, (ret_val.at_css('Error Code').content + ' : ' + ret_val.at_css('Error Message').content)
+        cloud_error(ret_val.at_css('Error Code').content + ' : ' + ret_val.at_css('Error Message').content)
       end
       if response.code.to_i == 200 || response.code.to_i == 201
         return response
       elsif response.code.to_i == 307
         #rebuild_request response
-        raise Bosh::Clouds::CloudError, "Currently bosh_azure_cpi does not support proxy."
+        cloud_error("Currently bosh_azure_cpi does not support proxy.")
       elsif response.code.to_i > 201 && response.code.to_i <= 299
         check_completion(response['x-ms-request-id'])
       elsif warn && !response.success?
       elsif response.body
         if ret_val.at_css('Error Code') && ret_val.at_css('Error Message')
-          raise Bosh::Clouds::CloudError, (ret_val.at_css('Error Code').content + ' : ' + ret_val.at_css('Error Message').content)
+          cloud_error(ret_val.at_css('Error Code').content + ' : ' + ret_val.at_css('Error Message').content)
         else
-          raise Bosh::Clouds::CloudError, "http error: #{response.code}"
+          cloud_error(nil, "http error: #{response.code}")
         end
       else
-        raise Bosh::Clouds::CloudError, "http error: #{response.code}"
+        cloud_error(nil, "http error: #{response.code}")
       end
     end
-
+    
     def check_completion(request_id)
       request_path = "/operations/#{request_id}"
       done = false
       while not done
-        print '# '
+        puts '# '
         response = http_get(request_path)
         ret_val = Nokogiri::XML response.body
         status = xml_content(ret_val, 'Operation Status')
@@ -138,7 +189,7 @@ module Bosh::AzureCloud
           if status.downcase != 'succeeded'
             error_code = xml_content(ret_val, 'Operation Error Code')
             error_msg = xml_content(ret_val, 'Operation Error Message')
-            raise Bosh::Clouds::CloudError, "#{error_code}: #{error_msg}"
+            cloud_error(nil, "#{error_code}: #{error_msg}")
           else
             puts "#{status.downcase} (#{status_code})"
           end
@@ -147,30 +198,6 @@ module Bosh::AzureCloud
           sleep(5)
         end
       end
-    end
-
-    def retry_azure_operation
-      retries = 0
-      retry_interval = DEFAULT_RETRY_TIMEOUT
-
-      begin
-        yield
-      rescue => e
-        if e.message.include?("ConflictError") || e.message.include?("TooManyRequests") || e.message.include?("Retry")
-          unless retries >= MAX_RETRIES
-            task_checkpoint
-            sleep(retry_interval)
-            retries += 1
-            @logger.info("retry #{retries} time")
-            retry
-          end
-        end
-        @logger.warn("#{e.message}\n#{e.backtrace.join("\n")}")
-      end
-    end
-
-    def task_checkpoint
-      Bosh::Clouds::Config.task_checkpoint
     end
   end
 end

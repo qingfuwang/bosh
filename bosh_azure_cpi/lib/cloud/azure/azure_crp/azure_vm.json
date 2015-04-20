@@ -1,0 +1,130 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2014-04-01-preview/deploymentTemplate.json",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "storageAccountName": {
+            "type": "string"
+        },
+        "adminUserName": {
+            "type": "string",
+            "defaultValue": "vcap"
+        },
+        "sshKeyData": {
+            "type": "string",
+            "defaultValue": "MIIDXTCCAkWgAwIBAgIJAKMUUukkbH/JMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNVBAYTAkFVMRMw\nEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBXaWRnaXRzIFB0eSBMdGQwHhcN\nMTUwNDA4MDYxNDExWhcNMTYwNDA3MDYxNDExWjBFMQswCQYDVQQGEwJBVTETMBEGA1UECAwKU29t\nZS1TdGF0ZTEhMB8GA1UECgwYSW50ZXJuZXQgV2lkZ2l0cyBQdHkgTHRkMIIBIjANBgkqhkiG9w0B\nAQEFAAOCAQ8AMIIBCgKCAQEAnPFyKJglAAZQAi/qZ5Wr2OM+fZTc+qCfGdvZRKoEGopl/g4kVFuh\n5hp091+3x2/4NisdcmauPIOkK2QajULx6l3LOdFaKaFvdCoLPjCwSvHWi28X66norMszhB1gHhO6\nRDstKQRiAzEaCQqc++TqBC52tb3OlPrxmlNvx78BWJmvPmhQ+gLIWujUbPfcr+c9SMfXFFao7l98\nGor4OMLlPX87RuOUmimPATwMeTyJPLcOCPggny/bT/uXP1myg6BrUaj/GlWjAkxSjpVOuVxw0ei9\nnfN/Ac44LScAqasiBgQaaaXko/XdSGmszsO0gkqMUrnRNBDXV7VaBFk0AFUg3QIDAQABo1AwTjAd\nBgNVHQ4EFgQUm745Yu9GecCzrn6NsQWjHy6EH3YwHwYDVR0jBBgwFoAUm745Yu9GecCzrn6NsQWj\nHy6EH3YwDAYDVR0TBAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAQEAQ0njEMp2FbHYXN+169c9y9E6\n6qb4yxeik0cw/bMvPdcgB4VICAxTBTrrN8WmLTB0XEbzYCKqS3ZcsFi7HC23WYALuGkMYxxZWvSp\nFSMHR2rQKCdrDlfQo/DWUwyhYqU5UypjgPZa9iomxFXxkKlum+sLTGmyxI/USA8MHWKObGqfJzTq\nCgiwOeaospRSSVzd4NI++icC37/suCsr4aQpqX+Jo0pupGXJ9BK5x7r8doXAOSP/IiX4vB82HsTh\nOl1ia2LsB9qWR+9vUobQrvOe6bwv3citQHzzrp4irISsGXqdlFYhMmYTlM688WA66j/tLg2kTe9j\nhmOd4+HidgdKGA==\n"
+        },
+        "imageUri": {
+            "type": "string"
+        },
+        "privateIPAddress": {
+            "type": "String",
+            "defaultValue": ""
+        },
+        "privateIPAddressType": {
+            "type": "String",
+            "defaultValue": "Dynamic"
+        },
+        "location": {
+            "type": "String",
+            "defaultValue": "West US"
+        },
+        "vmSize": {
+            "type": "string",
+            "defaultValue": "Standard_A0"
+        },
+        "customData": {
+            "type": "string",
+            "defaultValue": ""
+        },
+        "vmName": {
+            "type": "string",
+            "defaultValue": "myVM"
+        },
+        "nicName": {
+            "type": "string",
+            "defaultValue": "myNIC"
+        },
+        "virtualNetworkName": {
+            "type": "string"
+        },
+        "subnetName": {
+            "type": "string"
+        }
+    },
+    "variables": {
+        "vnetID": "[resourceId('Microsoft.Network/virtualNetworks',parameters('virtualNetworkName'))]",
+        "subnetRef": "[concat(variables('vnetID'),'/subnets/',parameters('subnetName'))]",
+        "vmStorageAccountContainerName": "stemcell",
+        "sshKeyPath": "[concat('/home/',parameters('adminUsername'),'/.ssh/authorized_keys')]"
+    },
+    "resources": [{
+            "apiVersion": "2014-12-01-preview",
+            "type": "Microsoft.Network/networkInterfaces",
+            "name": "[parameters('nicName')]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAddress": "[parameters('privateIPAddress')]",
+                            "privateIPAllocationMethod": "[parameters('privateIPAddressType')]",
+                            "subnet": {
+                                "id": "[variables('subnetRef')]"
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "apiVersion": "2014-12-01-preview",
+            "type": "Microsoft.Compute/virtualMachines",
+            "name": "[parameters('vmName')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/networkInterfaces/', parameters('nicName'))]"
+            ],
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "[parameters('vmSize')]"
+                },
+                "osProfile": {
+                    "customData": "[parameters('customData')]",
+                    "computername": "[parameters('vmName')]",
+                    "adminUsername": "[parameters('adminUsername')]",
+                    "linuxConfiguration": {
+                        "provisionVMAgent": "true",
+                        "disablePasswordAuthentication": "true",
+                        "ssh": {
+                            "publicKeys": [
+                                {
+                                    "path": "[variables('sshKeyPath')]",
+                                    "keyData": "[parameters('sshKeyData')]"
+                                }
+                            ]
+                        }
+                    }
+                },
+                "storageProfile": {
+                    "osDisk": {
+                        "name": "osDiskName",
+                        "osType": "linux",
+                        "image": {
+                            "uri": "[parameters('imageUri')]"
+                        }
+                    }
+
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces',parameters('nicName'))]"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
+
