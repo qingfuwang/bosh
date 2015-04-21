@@ -21,11 +21,11 @@ module Bosh::AzureCloud
 
     def find_stemcell_by_name(name)
       stemcell = stemcells.find do |image_name|
-        puts "find #{image_name.name}"
+        logger.debug "find #{image_name.name}"
         image_name.name == name || image_name.name == name+".vhd"
       end
 
-      raise Bosh::Clouds::CloudError, "Given image name '#{name}' does not exist!" if stemcell.nil?
+      cloud_error("Given image name '#{name}' does not exist!") if stemcell.nil?
       stemcell
     end
 

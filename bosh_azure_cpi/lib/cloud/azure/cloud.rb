@@ -101,11 +101,9 @@ module Bosh::AzureCloud
             azure_properties,
             NetworkConfigurator.new(networks),
             resource_pool)
-
            instance_id = generate_instance_id("__"+instance[:cloud_service_name]+"Service", "_"+instance[:vm_name])
 
           logger.info("Created new instance '#{instance_id}'")
-
           unless disk_locality.nil?
             logger.info("Attach disks to the new instance")
             disk_locality.each do |disk_id|

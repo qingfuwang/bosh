@@ -1,7 +1,6 @@
 module Bosh::AzureCloud
   class VMManager
     attr_accessor :logger
-
     include Helpers
 
     def initialize(storage_manager, registry, disk_manager)
@@ -12,20 +11,20 @@ module Bosh::AzureCloud
     end
 
     def create(uuid, stemcell, cloud_opts, network_configurator, resource_pool)
-       raise Bosh::Clouds::CloudError, "resource_group_name required for deployment"  if cloud_opts["resource_group_name"]==nil
-       instanceid = "bosh-#{cloud_opts["resource_group_name"]}-#{uuid}"
-       imageUri = "https://#{@storage_manager.get_storage_account_name}.blob.core.windows.net/stemcell/#{stemcell}"
-       sshKeyData = File.read(cloud_opts['ssh_certificate_file'])
-       params = {
-          :vmName             => instanceid,
+      cloud_error("resource_group_name required for deployment")  if cloud_opts["resource_group_name"]==nil
+      instanceid = "bosh-#{cloud_opts["resource_group_name"]}-#{uuid}"
+      imageUri = "https://#{@storage_manager.get_storage_account_name}.blob.core.windows.net/stemcell/#{stemcell}"
+      sshKeyData = File.read(cloud_opts['ssh_certificate_file'])
+      params = {
+          :vmName              => instanceid,
           :nicName             => instanceid,
           :adminUserName       => cloud_opts['ssh_user'],
-          :imageUri           => imageUri,
-          :location           => cloud_opts['location'],
-          :vmSize => resource_pool['instance_type'],
-          :storageAccountName => @storage_manager.get_storage_account_name,
-          :customData => get_user_data(instanceid, network_configurator.dns),
-          :sshKeyData => sshKeyData
+          :imageUri            => imageUri,
+          :location            => cloud_opts['location'],
+          :vmSize              => resource_pool['instance_type'],
+          :storageAccountName  => @storage_manager.get_storage_account_name,
+          :customData          => get_user_data(instanceid, network_configurator.dns),
+          :sshKeyData          => sshKeyData
       }
         params[:virtualNetworkName] = network_configurator.virtual_network_name
         params[:subnetName]          = network_configurator.subnet_name
@@ -43,19 +42,20 @@ module Bosh::AzureCloud
       if !network_configurator.vip_network.nil? and result
            ipname = invoke_auzre_js("-r #{cloud_opts['resource_group_name']} -t findResource properties:ipAddress  #{network_configurator.reserved_ip} Microsoft.Network/publicIPAddresses".split(" "),logger)[0]
            
-         p = {"StorageAccountName"=> @storage_manager.get_storage_account_name,
-              "lbName"=> network_property['load_balance_name']?network_property['load_balance_name']:instanceid,
-              "publicIPAddressName"=>ipname,
-              "nicName"=>instanceid,
-              "virtualNetworkName"=>"vnet",
-              "TcpEndPoints"=> network_configurator.tcp_endpoints,
-              "UdpEndPoints"=>network_configurator.udp_endpoints
+         p = {"StorageAccountName"      => @storage_manager.get_storage_account_name,
+              "lbName"                  => network_property['load_balance_name']?network_property['load_balance_name']:instanceid,
+              "publicIPAddressName"     =>ipname,
+              "nicName"                 =>instanceid,
+              "virtualNetworkName"      =>"vnet",
+              "TcpEndPoints"            => network_configurator.tcp_endpoints,
+              "UdpEndPoints"            =>network_configurator.udp_endpoints
             }
           p = p.merge(params)
           args = "-t deploy -r #{cloud_opts["resource_group_name"]}  ".split(" ")      
           args.push(File.join(File.dirname(__FILE__),"azure_crp","azure_vm_endpoints.json"))
           args.push(Base64.encode64(p.to_json()))
           result = invoke_auzre_js(args,logger)
+		  #set_tag(instanceid,{"vip" => network_configurator.reserved_ip})
       end
       if not result
         invoke_auzre_js("-t delete -r #{cloud_opts["resource_group_name"]} #{instanceid} Microsoft.Network/loadBalancers".split(" "),logger)
@@ -70,39 +70,45 @@ module Bosh::AzureCloud
 
     
     def find(instance_id)
-       vm_property= JSON(invoke_auzre_js_with_id(["get",instance_id,"Microsoft.Compute/virtualMachines"],logger)[0])["properties"]
-       nic = JSON(invoke_auzre_js_with_id(["get",instance_id,"Microsoft.Network/networkInterfaces"],logger)[0])["properties"]["ipConfigurations"][0] 
-       return {"dataDisks"=>vm_property["storageProfile"]["dataDisks"],"privateIP"=>nic["properties"]["privateIPAddress"]}
+       vm= JSON(invoke_auzre_js_with_id(["get",instance_id,"Microsoft.Compute/virtualMachines"],logger))
+       nic = JSON(invoke_auzre_js_with_id(["get",instance_id,"Microsoft.Network/networkInterfaces"],logger)[0])["properties"]["ipConfigurations"]
+       return {
+	            "data_disks"    => vm["properties"]["storageProfile"]["dataDisks"],
+	           "ipaddress"     => nic["properties"]["privateIPAddress"],
+			    "vm_name"       => vm["name"],
+				"dipaddress"    => vm["tags"]["vip"],
+				"status"        => vm["properties"]["provisioningState"]
+			   }
     end
 
     def delete(instance_id)
        shutdown(instance_id)
-       invoke_auzre_js_with_id(["delete",instance_id,"Microsoft.Compute/virtualMachines"],logger)[0]
-       invoke_auzre_js_with_id(["delete",instance_id,"Microsoft.Network/loadBalancers"],logger)[0]
-       invoke_auzre_js_with_id(["delete",instance_id,"Microsoft.Network/networkInterfaces"],logger)[0]
+       invoke_auzre_js_with_id(["delete",instance_id,"Microsoft.Compute/virtualMachines"],logger)
+       invoke_auzre_js_with_id(["delete",instance_id,"Microsoft.Network/loadBalancers"],logger)
+       invoke_auzre_js_with_id(["delete",instance_id,"Microsoft.Network/networkInterfaces"],logger)
     end
 
     def reboot(instance_id)
-        invoke_auzre_js_with_id(["reboot",instance_id],logger)[0]
+        invoke_auzre_js_with_id(["reboot",instance_id],logger)
     end
 
     def start(instance_id)
-        invoke_auzre_js_with_id(["start",instance_id],logger)[0]
+        invoke_auzre_js_with_id(["start",instance_id],logger)
     end
 
     def shutdown(instance_id)
-         invoke_auzre_js_with_id(["stop",instance_id],logger)[0]
+         invoke_auzre_js_with_id(["stop",instance_id],logger)
     end
     def set_tag(instance_id,tag)
          tagStr = ""
          tag.each do |i| tagStr<<"#{i[0]}=#{i[1]};" end    
          tagStr = tagStr[0..-2]
-         invoke_auzre_js_with_id(["setTag",instance_id,"Microsoft.Compute/virtualMachines",tagStr],logger)[0]
+         invoke_auzre_js_with_id(["setTag",instance_id,"Microsoft.Compute/virtualMachines",tagStr],logger)
     end
     def instance_id(wala_lib_path)
       contents = File.open(wala_lib_path + "/SharedConfig.xml", "r"){ |file| file.read }
       vm_name = contents.match("^*<Incarnation number=\"\\d*\" instance=\"(.*)\" guid=\"{[-0-9a-fA-F]+}\"[\\s]*/>")[1]
-      generate_instance_id(vm_name)
+      generate_instance_id(vm_name,"")
     end
     
     ##
@@ -122,6 +128,17 @@ module Bosh::AzureCloud
         invoke_auzre_js_with_id(["rmdisk",instance_id,disk_uri],logger)
     end
     
+	def get_disks(instance_id)
+      logger.debug("get_disks(#{instance_id})")
+      vm = find(instance_id) || cloud_error('Given instance id does not exist')
+
+      data_disks = []
+      vm.data_disks.each do |disk|
+        data_disks << disk[:name]
+      end
+      data_disks
+    end
+
     private
 
     def get_user_data(vm_name, dns)

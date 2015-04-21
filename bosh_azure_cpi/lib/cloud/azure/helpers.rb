@@ -51,6 +51,7 @@ module Bosh::AzureCloud
                     data = stdout.read_nonblock(1024000)
                     logger.info(data)
                     stdstr+=data;
+					task_checkpoint
                 end
                 rescue Errno::EAGAIN
                 retry
@@ -68,7 +69,7 @@ module Bosh::AzureCloud
             logger.debug(result)
             #cloud_error("command execute failed ,abort :"+args) if exitcode==1 and abort_on_error
             return nil if result["Failed"];
-            return result["R"]
+            return result["R"][0]
       }
     end
 
@@ -79,7 +80,7 @@ module Bosh::AzureCloud
         begin
            #(__bosh-qingfu3-bm-0458d6c4-6534-4724-81f1-d71e50df778fService&_bosh-qingfu3-bm-0458d6c4-6534-4724-81f1-d71e50df778f
             resource_group_name = id.split('&')[0][7..-48]
-            puts("resource_group_name is" +resource_group_name)
+            logger.debug("resource_group_name is" +resource_group_name)
             return invoke_auzre_js(["-t",task,"-r",resource_group_name,id.split('&')[1][1..-1]].concat(arg[2..-1]),logger)
         rescue Exception => ex
             puts("error:"+ex.message+ex.backtrace.join("\n"))
@@ -170,6 +171,10 @@ module Bosh::AzureCloud
       end
     end
     
+	def task_checkpoint
+      Bosh::Clouds::Config.task_checkpoint
+    end
+
     def check_completion(request_id)
       request_path = "/operations/#{request_id}"
       done = false

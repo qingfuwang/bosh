@@ -32,7 +32,7 @@ module Bosh::AzureCloud
     end
 
     def get_blob_uri(container_name,blob_name)
-	return Azure.config.storage_blob_host+"/bosh/"+blob_name
+	return Azure.config.storage_blob_host+"#{container_name}"+blob_name
     end
 
     def get_blob_size(uri)

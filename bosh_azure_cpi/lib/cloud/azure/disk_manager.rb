@@ -50,9 +50,18 @@ module Bosh::AzureCloud
       return true
     end
 
-
     def get_disk_uri(disk_name)
       return @blob_manager.get_blob_uri(@container_name,disk_name+".vhd")
     end
+
+   def disks
+      disk= @blob_manager.list_blobs(@container_name).select{ |d| return d.name=~/vhd$/
+          }.map {|d| return {
+                        :name     => d.name,
+                        :attached => d.properties[:lease_status]=='unlocked'?false:true
+                     }
+                }    
+   end
+
   end
 end
