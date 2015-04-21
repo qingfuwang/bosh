@@ -78,8 +78,8 @@ module Bosh::Deployer
       # @return [Integer] size in MiB
       def disk_size(cid)
         # AZURE stores disk size in GiB but the CPI uses MiB
-        disk = instance_manager.cloud.azure.vm_manager.find(instance_manager.state.vm_cid)["dataDisks"].select { |x| x["vhd"]["uri"] =~ /#{cid}/ }
-        (instance_manager.cloud.azure.blob_manager.get_blob_size(disk.first["vhd"]["uri"])-512)/1024/1024
+        disk_uri = instance_manager.cloud.azure.disk_manager.get_disk_uri(cid)
+        (instance_manager.cloud.azure.blob_manager.get_blob_size(disk_uri)-512)/1024/1024
       end
 
       def persistent_disk_changed?

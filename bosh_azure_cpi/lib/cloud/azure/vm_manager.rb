@@ -92,26 +92,26 @@ module Bosh::AzureCloud
     end
 
     def reboot(instance_id)
-        invoke_auzre_js_with_id(["reboot",instance_id],logger)
+       invoke_auzre_js_with_id(["reboot",instance_id],logger)
     end
 
     def start(instance_id)
-        invoke_auzre_js_with_id(["start",instance_id],logger)
+       invoke_auzre_js_with_id(["start",instance_id],logger)
     end
 
     def shutdown(instance_id)
-         invoke_auzre_js_with_id(["stop",instance_id],logger)
+       invoke_auzre_js_with_id(["stop",instance_id],logger)
     end
     def set_tag(instance_id,tag)
-         tagStr = ""
-         tag.each do |i| tagStr<<"#{i[0]}=#{i[1]};" end    
-         tagStr = tagStr[0..-2]
-         invoke_auzre_js_with_id(["setTag",instance_id,"Microsoft.Compute/virtualMachines",tagStr],logger)
+       tagStr = ""
+       tag.each do |i| tagStr<<"#{i[0]}=#{i[1]};" end    
+       tagStr = tagStr[0..-2]
+       invoke_auzre_js_with_id(["setTag",instance_id,"Microsoft.Compute/virtualMachines",tagStr],logger)
     end
     def instance_id(wala_lib_path)
-      contents = File.open(wala_lib_path + "/SharedConfig.xml", "r"){ |file| file.read }
-      vm_name = contents.match("^*<Incarnation number=\"\\d*\" instance=\"(.*)\" guid=\"{[-0-9a-fA-F]+}\"[\\s]*/>")[1]
-      generate_instance_id(vm_name,"")
+       contents = File.open(wala_lib_path + "/SharedConfig.xml", "r"){ |file| file.read }
+       vm_name = contents.match("^*<Incarnation number=\"\\d*\" instance=\"(.*)\" guid=\"{[-0-9a-fA-F]+}\"[\\s]*/>")[1]
+       generate_instance_id(vm_name,"")
     end
     
     ##
@@ -130,11 +130,10 @@ module Bosh::AzureCloud
         disk_uri= @disk_manager.get_disk_uri(disk_name)
         invoke_auzre_js_with_id(["rmdisk",instance_id,disk_uri],logger)
     end
-
+    
     def get_disks(instance_id)
       logger.debug("get_disks(#{instance_id})")
       vm = find(instance_id) || cloud_error('Given instance id does not exist')
-
       data_disks = []
       vm.data_disks.each do |disk|
         data_disks << disk[:name]
