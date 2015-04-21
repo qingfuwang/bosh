@@ -54,13 +54,23 @@ module Bosh::AzureCloud
       return @blob_manager.get_blob_uri(@container_name,disk_name+".vhd")
     end
 
+   def get_new_osdisk_uri(vm_id,stemcell)
+      destination_blob = vm_id+String(Time.now.to_i)+"_os_disk.vhd"
+      return  @blob_manager.get_blob_uri(@container_name,destination_blob)
+   end
+
+   def get_stemcell_uri(stemcell)
+      return @blob_manager.get_blob_uri("stemcell",stemcell)
+    end
+
    def disks
-      disk= @blob_manager.list_blobs(@container_name).select{ |d| return d.name=~/vhd$/
+      disks= @blob_manager.list_blobs(@container_name).select{ |d| return d.name=~/vhd$/
           }.map {|d| return {
                         :name     => d.name,
                         :attached => d.properties[:lease_status]=='unlocked'?false:true
                      }
-                }    
+                }
+     return disks 
    end
 
   end

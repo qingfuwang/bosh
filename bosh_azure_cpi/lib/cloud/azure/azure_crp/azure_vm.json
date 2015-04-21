@@ -16,6 +16,9 @@
         "imageUri": {
             "type": "string"
         },
+        "osvhdUri": {
+            "type": "string"
+        },
         "privateIPAddress": {
             "type": "string",
             "defaultValue": ""
@@ -110,6 +113,7 @@
                     "osDisk": {
                         "name": "osDiskName",
                         "osType": "linux",
+                        "createOption":"fromImage",
                         "image": {
                             "uri": "[parameters('imageUri')]"
                         }

@@ -1,7 +1,7 @@
 module Bosh::AzureCloud
   class BlobManager
     attr_accessor :logger
-    
+    attr_reader   :blob_service_client
     include Helpers
     
     VHDBlock = Struct.new(:id, :file_start_range, :size, :blob_start_range, :content)
@@ -32,7 +32,7 @@ module Bosh::AzureCloud
     end
 
     def get_blob_uri(container_name,blob_name)
-	return Azure.config.storage_blob_host+"#{container_name}"+blob_name
+	return Azure.config.storage_blob_host+"/#{container_name}/"+blob_name
     end
 
     def get_blob_size(uri)

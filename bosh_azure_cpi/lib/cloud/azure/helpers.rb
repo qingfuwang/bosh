@@ -69,6 +69,7 @@ module Bosh::AzureCloud
             logger.debug(result)
             #cloud_error("command execute failed ,abort :"+args) if exitcode==1 and abort_on_error
             return nil if result["Failed"];
+            return result["R"] if result["R"][0] == nil
             return result["R"][0]
       }
     end

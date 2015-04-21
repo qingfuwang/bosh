@@ -13,13 +13,15 @@ module Bosh::AzureCloud
     def create(uuid, stemcell, cloud_opts, network_configurator, resource_pool)
       cloud_error("resource_group_name required for deployment")  if cloud_opts["resource_group_name"]==nil
       instanceid = "bosh-#{cloud_opts["resource_group_name"]}-#{uuid}"
-      imageUri = "https://#{@storage_manager.get_storage_account_name}.blob.core.windows.net/stemcell/#{stemcell}"
+      imageUri = @disk_manager.get_stemcell_uri(stemcell)
+      osvhdUri = @disk_manager.get_new_osdisk_uri(instanceid,stemcell)
       sshKeyData = File.read(cloud_opts['ssh_certificate_file'])
       params = {
           :vmName              => instanceid,
           :nicName             => instanceid,
           :adminUserName       => cloud_opts['ssh_user'],
           :imageUri            => imageUri,
+          :osvhdUri            => osvhdUri,
           :location            => cloud_opts['location'],
           :vmSize              => resource_pool['instance_type'],
           :storageAccountName  => @storage_manager.get_storage_account_name,
@@ -55,7 +57,7 @@ module Bosh::AzureCloud
           args.push(File.join(File.dirname(__FILE__),"azure_crp","azure_vm_endpoints.json"))
           args.push(Base64.encode64(p.to_json()))
           result = invoke_auzre_js(args,logger)
-		  #set_tag(instanceid,{"vip" => network_configurator.reserved_ip})
+          #set_tag(instanceid,{"vip" => network_configurator.reserved_ip})
       end
       if not result
         invoke_auzre_js("-t delete -r #{cloud_opts["resource_group_name"]} #{instanceid} Microsoft.Network/loadBalancers".split(" "),logger)
@@ -71,13 +73,13 @@ module Bosh::AzureCloud
     
     def find(instance_id)
        vm= JSON(invoke_auzre_js_with_id(["get",instance_id,"Microsoft.Compute/virtualMachines"],logger))
-       nic = JSON(invoke_auzre_js_with_id(["get",instance_id,"Microsoft.Network/networkInterfaces"],logger)[0])["properties"]["ipConfigurations"]
+       nic = JSON(invoke_auzre_js_with_id(["get",instance_id,"Microsoft.Network/networkInterfaces"],logger))["properties"]["ipConfigurations"][0]
        return {
 	            "data_disks"    => vm["properties"]["storageProfile"]["dataDisks"],
-	           "ipaddress"     => nic["properties"]["privateIPAddress"],
-			    "vm_name"       => vm["name"],
-				"dipaddress"    => vm["tags"]["vip"],
-				"status"        => vm["properties"]["provisioningState"]
+	            "ipaddress"     => nic["properties"]["privateIPAddress"],
+                    "vm_name"       => vm["name"],
+                    "dipaddress"    => vm["tags"]?vm["tags"]["vip"]:nil,
+                    "status"        => vm["properties"]["provisioningState"]
 			   }
     end
 
