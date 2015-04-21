@@ -54,7 +54,7 @@ module Bosh::AzureCloud
       return @blob_manager.get_blob_uri(@container_name,disk_name+".vhd")
     end
 
-   def get_new_osdisk_uri(vm_id,stemcell)
+   def get_new_osdisk_uri(vm_id)
       destination_blob = vm_id+String(Time.now.to_i)+"_os_disk.vhd"
       return  @blob_manager.get_blob_uri(@container_name,destination_blob)
    end

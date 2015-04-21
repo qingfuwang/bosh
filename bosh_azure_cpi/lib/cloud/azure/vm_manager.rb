@@ -13,8 +13,8 @@ module Bosh::AzureCloud
     def create(uuid, stemcell, cloud_opts, network_configurator, resource_pool)
       cloud_error("resource_group_name required for deployment")  if cloud_opts["resource_group_name"]==nil
       instanceid = "bosh-#{cloud_opts["resource_group_name"]}-#{uuid}"
-      imageUri = @disk_manager.get_stemcell_uri(stemcell)
-      osvhdUri = @disk_manager.get_new_osdisk_uri(instanceid,stemcell)
+      imageUri = @disk_manager.get_stemcell_uri(stemcell+".vhd")
+      osvhdUri = @disk_manager.get_new_osdisk_uri(instanceid)
       sshKeyData = File.read(cloud_opts['ssh_certificate_file'])
       params = {
           :vmName              => instanceid,
@@ -39,10 +39,11 @@ module Bosh::AzureCloud
       args = "-t deploy -r #{cloud_opts['resource_group_name']}".split(" ")      
       args.push(File.join(File.dirname(__FILE__),"azure_crp","azure_vm.json"))
       args.push(Base64.encode64(params.to_json()))
+      result = 'OK'
       result = invoke_auzre_js(args,logger)
       network_property = network_configurator.network.spec["cloud_properties"] 
       if !network_configurator.vip_network.nil? and result
-           ipname = invoke_auzre_js("-r #{cloud_opts['resource_group_name']} -t findResource properties:ipAddress  #{network_configurator.reserved_ip} Microsoft.Network/publicIPAddresses".split(" "),logger)[0]
+           ipname = invoke_auzre_js("-r #{cloud_opts['resource_group_name']} -t findResource properties:ipAddress  #{network_configurator.reserved_ip} Microsoft.Network/publicIPAddresses".split(" "),logger)
            
          p = {"StorageAccountName"      => @storage_manager.get_storage_account_name,
               "lbName"                  => network_property['load_balance_name']?network_property['load_balance_name']:instanceid,
@@ -129,8 +130,8 @@ module Bosh::AzureCloud
         disk_uri= @disk_manager.get_disk_uri(disk_name)
         invoke_auzre_js_with_id(["rmdisk",instance_id,disk_uri],logger)
     end
-    
-	def get_disks(instance_id)
+
+    def get_disks(instance_id)
       logger.debug("get_disks(#{instance_id})")
       vm = find(instance_id) || cloud_error('Given instance id does not exist')
 
@@ -151,7 +152,7 @@ module Bosh::AzureCloud
     end
     
     def get_volume_name(instance_id, disk_name)
-      data_disk = find(instance_id)["dataDisks"].find { |disk| disk["vhd"]["uri"] == disk_name}
+      data_disk = find(instance_id)["data_disks"].find { |disk| disk["vhd"]["uri"] == disk_name}
       data_disk || cloud_error('Given disk name is not attached to given instance id')
       lun = get_disk_lun(data_disk)
       logger.info("get_volume_name return lun #{lun}")

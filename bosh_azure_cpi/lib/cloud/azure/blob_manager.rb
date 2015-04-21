@@ -1,7 +1,6 @@
 module Bosh::AzureCloud
   class BlobManager
     attr_accessor :logger
-    attr_reader   :blob_service_client
     include Helpers
     
     VHDBlock = Struct.new(:id, :file_start_range, :size, :blob_start_range, :content)

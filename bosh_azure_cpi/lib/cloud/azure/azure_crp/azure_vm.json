@@ -116,6 +116,9 @@
                         "createOption":"fromImage",
                         "image": {
                             "uri": "[parameters('imageUri')]"
+                        },
+                        "vhd": {
+                            "uri": "[parameters('osvhdUri')]"
                         }
                     }
 
