@@ -16,8 +16,8 @@ Before you can run BAT, you need to set the following environment variables:
 * `BAT_DEPLOYMENT_SPEC` - path to the bat yaml file which is used to generate the deployment manifest (see bat/templates)
 * `BAT_VCAP_PASSWORD` - password used to ssh to the stemcells
 * `BAT_DNS_HOST` - DNS host or IP where BOSH-controlled PowerDNS server is running, which is required for the DNS tests. For example, if BAT is being run against a MicroBOSH then this value will be the same as BAT_DIRECTOR
-* `BOSH_KEY_PATH` - the full path to the private key for ssh into the bosh instances
-* `BAT_INFRASTRUCTURE` - the name of infrastructure that is used by bosh deployment. Examples: aws, vsphere, openstack, warden.
+* `BAT_VCAP_PRIVATE_KEY` - the full path to the private key for ssh into the bosh instances
+* `BAT_INFRASTRUCTURE` - the name of infrastructure that is used by bosh deployment. Examples: aws, vsphere, openstack, warden, azure.
 * `BAT_NETWORKING` - the type of networking being used: `dynamic` or `manual`.
 
 The 'dns' property MUST NOT be specified in the bat deployment spec properties. At all.
@@ -149,6 +149,65 @@ properties:
     reserved: ['192.168.79.2 - 192.168.79.50', '192.168.79.128 - 192.168.79.254'] # multiple reserved ranges are allowed but optional
     static: ['192.168.79.60 - 192.168.79.70']
     gateway: 192.168.79.1
+```
+
+
+On Azure with Azure-provided DHCP:
+
+```yaml
+---
+cpi: azure
+properties:
+  uuid: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx # BAT_DIRECTOR UUID
+  stemcell:
+    name: bosh-azure-hyperv-ubuntu
+    version: latest
+  vip: 0.0.0.43 # Reserved IP assigned to the bat-release job vm ('static' network), for ssh testing
+  pool_size: 1
+  instances: 1
+  networks:
+  - name: default
+    type: dynamic
+    cloud_properties:
+      virtual_network_name: xxx
+      subnet_name: xxx
+      tcp_endpoints:
+      - 80:80
+      - 443:443
+      - 4222:4222
+      - 4443:4443
+  key_name: bosh # (optional) SSH keypair name, overrides the director's default_key_name setting
+```
+
+On Azure with VNET networking:
+
+```yaml
+---
+cpi: azure
+properties:
+  uuid: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx # BAT_DIRECTOR UUID
+  stemcell:
+    name: bosh-azure-hyperv-ubuntu
+    version: latest
+  vip: 0.0.0.43 # Reserved IP assigned to the bat-release job vm ('static' network), for ssh testing
+  pool_size: 1
+  instances: 1
+  - name: default
+    type: manual
+    static_ip: 10.0.1.30 # Private IP assigned to the bat-release job vm, must be in the static range
+    cloud_properties:
+      virtual_network_name: xxx
+      subnet_name: xxx
+      tcp_endpoints:
+      - 80:80
+      - 443:443
+      - 4222:4222
+      - 4443:4443
+    cidr: 10.0.1.0/24
+    reserved: ['10.0.1.2 - 10.0.1.9']
+    static: ['10.0.1.10 - 10.0.1.30']
+    gateway: 10.0.1.1
+  key_name: bosh # (optional) SSH keypair name, overrides the director's default_key_name setting
 ```
 
 ## EC2 Networking Config

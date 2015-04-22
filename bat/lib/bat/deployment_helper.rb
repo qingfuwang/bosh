@@ -106,7 +106,7 @@ module Bat
     end
 
     def public_ip
-      # For AWS and OpenStack, the elastic IP is the public IP
+      # For AWS, Azure and OpenStack, the elastic IP is the public IP
       # For vSphere and vCloud, the static_ip is the public IP
       @spec['properties']['vip'] || static_ip
     end

@@ -113,6 +113,7 @@ describe 'with release and stemcell and two deployments' do
       skip "This fails on AWS VPC because use_static_ip only sets the eip but doesn't prevent collision" if aws?
       skip "This fails on OpenStack because use_static_ip only sets the floating IP but doesn't prevent collision" if openstack?
       skip "This fails on Warden because use_static_ip only sets the floating IP but doesn't prevent collision" if warden?
+      skip "This fails on Azure because use_static_ip only sets the reserved IP but doesn't prevent collision" if azure?
 
       # second deployment can't use static IP or elastic IP or there will be a collision with the first deployment
       no_static_ip
@@ -140,6 +141,7 @@ describe 'with release and stemcell and two deployments' do
       skip "doesn't work on AWS as the VIP IP isn't visible to the VM" if aws?
       skip "doesn't work on OpenStack as the VIP IP isn't visible to the VM" if openstack?
       skip "doesn't work on Warden as the VIP IP isn't visible to eth0" if warden?
+      skip "doesn't work on Azure as the VIP IP isn't visible to the VM" if azure?
       expect(ssh(public_ip, 'vcap', '/sbin/ifconfig eth0', @our_ssh_options)).to match /#{static_ip}/
     end
 

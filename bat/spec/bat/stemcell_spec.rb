@@ -98,6 +98,10 @@ describe Bat::Stemcell do
       'bosh-warden-boshlite-ubuntu-go_agent' => false,
       'bosh-warden-boshlite-centos-go_agent' => false,
 
+      # Azure CPI does not support network reconfig
+      'bosh-azure-hyperv-ubuntu-go_agent' => false,
+      'bosh-azure-hyperv-centos-go_agent' => false,
+
     }.each do |stemcell_name, expected|
       it "returns #{expected} for #{stemcell_name}" do
         stemcell = Bat::Stemcell.new(stemcell_name, nil)
