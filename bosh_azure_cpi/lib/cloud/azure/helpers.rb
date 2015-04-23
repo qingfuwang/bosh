@@ -61,7 +61,7 @@ module Bosh::AzureCloud
             errstr = stderr.read;
             stdstr+=stdout.read
             if errstr and errstr.length>0
-                errstr="Please check if env NODE_PATH is correct\r"+errstr if errstr=~/Function.Module._load/
+                errstr="\n \t\tPlease check if env NODE_PATH is correct\r"+errstr if errstr=~/Function.Module._load/
                 cloud_error(errstr);
                 return nil
             end
@@ -69,7 +69,10 @@ module Bosh::AzureCloud
             result = JSON(matchdata.captures[0]) if  matchdata
             exitcode = wait_thr.value
             logger.debug(result)
-            #cloud_error("command execute failed ,abort :"+args) if exitcode==1 and abort_on_error
+            cloud_error("AuthorizationFailed please try azure login\n") if result["Failed"] and result["Failed"]["code"] =~/AuthorizationFailed/
+            cloud_error("Can't find token in ~/.azure/azureProfile.json or ~/.azure/accessTokens.json\n 
+                             Try azure login    \n") if result["Failed"] and result["Failed"]["code"] =~/RefreshToken Fail/
+
             return nil if result["Failed"];
             return result["R"] if result["R"][0] == nil
             return result["R"][0]
