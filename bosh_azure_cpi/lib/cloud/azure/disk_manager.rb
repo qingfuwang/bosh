@@ -61,7 +61,7 @@ module Bosh::AzureCloud
 
    def get_stemcell_uri(stemcell)
       return @blob_manager.get_blob_uri("stemcell",stemcell)
-    end
+   end
 
    def disks
       disks= @blob_manager.list_blobs(@container_name).select{ |d| return d.name=~/vhd$/

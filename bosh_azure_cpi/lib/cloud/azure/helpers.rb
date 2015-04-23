@@ -51,7 +51,7 @@ module Bosh::AzureCloud
                     data = stdout.read_nonblock(1024000)
                     logger.info(data)
                     stdstr+=data;
-					task_checkpoint
+                    task_checkpoint
                 end
                 rescue Errno::EAGAIN
                 retry
@@ -60,8 +60,10 @@ module Bosh::AzureCloud
 
             errstr = stderr.read;
             stdstr+=stdout.read
-            if errstr
-                logger.warn(errstr);
+            if errstr and errstr.length>0
+                errstr="Please check if env NODE_PATH is correct\r"+errstr if errstr=~/Function.Module._load/
+                cloud_error(errstr);
+                return nil
             end
             matchdata = stdstr.match(/##RESULTBEGIN##(.*)##RESULTEND##/im)
             result = JSON(matchdata.captures[0]) if  matchdata
@@ -172,7 +174,7 @@ module Bosh::AzureCloud
       end
     end
     
-	def task_checkpoint
+    def task_checkpoint
       Bosh::Clouds::Config.task_checkpoint
     end
 
@@ -180,7 +182,7 @@ module Bosh::AzureCloud
       request_path = "/operations/#{request_id}"
       done = false
       while not done
-        puts '# '
+        print '# '
         response = http_get(request_path)
         ret_val = Nokogiri::XML response.body
         status = xml_content(ret_val, 'Operation Status')
