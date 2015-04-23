@@ -16,13 +16,14 @@ module Bosh::AzureCloud
       imageUri = @disk_manager.get_stemcell_uri(stemcell+".vhd")
       osvhdUri = @disk_manager.get_new_osdisk_uri(instanceid)
       sshKeyData = File.read(cloud_opts['ssh_certificate_file'])
+      location = invoke_azure_js("-t getlocation -r #{cloud_opts['resource_group_name']}".split(" "),logger)
       params = {
           :vmName              => instanceid,
           :nicName             => instanceid,
           :adminUserName       => cloud_opts['ssh_user'],
           :imageUri            => imageUri,
           :osvhdUri            => osvhdUri,
-          :location            => cloud_opts['location'],
+          :location            => location,
           :vmSize              => resource_pool['instance_type'],
           :storageAccountName  => @storage_manager.get_storage_account_name,
           :customData          => get_user_data(instanceid, network_configurator.dns),
@@ -35,17 +36,28 @@ module Bosh::AzureCloud
           params[:privateIPAddress] = network_configurator.private_ip
           params[:privateIPAddressType] = "Static"
       end
- 
+      default_security_groupname = "bosh"
       args = "-t deploy -r #{cloud_opts['resource_group_name']}".split(" ")      
       args.push(File.join(File.dirname(__FILE__),"azure_crp","azure_vm.json"))
       args.push(Base64.encode64(params.to_json()))
       result = 'OK'
-      result = invoke_auzre_js(args,logger)
+      result = invoke_azure_js(args,logger)
       network_property = network_configurator.network.spec["cloud_properties"] 
       if !network_configurator.vip_network.nil? and result
-           ipname = invoke_auzre_js("-r #{cloud_opts['resource_group_name']} -t findResource properties:ipAddress  #{network_configurator.reserved_ip} Microsoft.Network/publicIPAddresses".split(" "),logger)
-           
-         p = {"StorageAccountName"      => @storage_manager.get_storage_account_name,
+           ip_crp_template = 'azure_vm_endpoints.json' 
+           ipname = invoke_azure_js("-r #{cloud_opts['resource_group_name']} -t findResource properties:ipAddress  #{network_configurator.reserved_ip} Microsoft.Network/publicIPAddresses".split(" "),logger)
+           #if vip is not a reserved ip, then create an ipaddress with given label name
+           #add nic to 'bosh' network security group,ignore error
+           if ipname==nil || ipname.length==0 
+               logger.debug(network_configurator.reserved_ip+" is not a reserved ip , go to create ip and take it as fqdn name")
+               ipname = instanceid;
+               invoke_azure_js("-r #{cloud_opts['resource_group_name']} -t createip #{ipname}  #{network_configurator.reserved_ip.split(".")[0].split("/")[-1]}".split(" "),logger)
+               ip_crp_template = "azure_vm_ip.json"
+               invoke_azure_js("-r #{cloud_opts['resource_group_name']} -t addsecuritygroup #{ipname} #{default_security_groupname}".split(" "),logger)
+           end
+
+           #bind the ip or endpoint to nic of that vm
+           p = {"StorageAccountName"      => @storage_manager.get_storage_account_name,
               "lbName"                  => network_property['load_balance_name']?network_property['load_balance_name']:instanceid,
               "publicIPAddressName"     =>ipname,
               "nicName"                 =>instanceid,
@@ -53,60 +65,63 @@ module Bosh::AzureCloud
               "TcpEndPoints"            => network_configurator.tcp_endpoints,
               "UdpEndPoints"            =>network_configurator.udp_endpoints
             }
+
           p = p.merge(params)
           args = "-t deploy -r #{cloud_opts["resource_group_name"]}  ".split(" ")      
-          args.push(File.join(File.dirname(__FILE__),"azure_crp","azure_vm_endpoints.json"))
+          args.push(File.join(File.dirname(__FILE__),"azure_crp",ip_crp_template))
           args.push(Base64.encode64(p.to_json()))
-          result = invoke_auzre_js(args,logger)
+          result = invoke_azure_js(args,logger)
           #set_tag(instanceid,{"vip" => network_configurator.reserved_ip})
       end
       if not result
-        invoke_auzre_js("-t delete -r #{cloud_opts["resource_group_name"]} #{instanceid} Microsoft.Network/loadBalancers".split(" "),logger)
-        invoke_auzre_js("-t delete -r #{cloud_opts["resource_group_name"]} #{instanceid} Microsoft.Compute/virtualMachines".split(" "),logger)
-        invoke_auzre_js("-t delete -r #{cloud_opts["resource_group_name"]} #{instanceid} Microsoft.Network/networkInterfaces".split(" "),logger)
-        cloud_error("create vm failed")        
+         delete(instanceid)
+         cloud_error("create vm failed")        
       end 
-
-      return {:cloud_service_name=>instanceid,:vm_name=>instanceid} if result
+      return instanceid if result
       
     end
 
     
     def find(instance_id)
-       vm= JSON(invoke_auzre_js_with_id(["get",instance_id,"Microsoft.Compute/virtualMachines"],logger))
-       nic = JSON(invoke_auzre_js_with_id(["get",instance_id,"Microsoft.Network/networkInterfaces"],logger))["properties"]["ipConfigurations"][0]
+       vm= JSON(invoke_azure_js_with_id(["get",instance_id,"Microsoft.Compute/virtualMachines"],logger))
+       publicip = invoke_azure_js_with_id(["get",instance_id,"Microsoft.Network/publicIPAddresses"],logger)
+       publicip = JSON(publicip) if publicip
+       dipaddress = (publicip!=nil)?publicip["properties"]["ipAddress"]:nil;
+       
+       nic = JSON(invoke_azure_js_with_id(["get",instance_id,"Microsoft.Network/networkInterfaces"],logger))["properties"]["ipConfigurations"][0]
        return {
 	            "data_disks"    => vm["properties"]["storageProfile"]["dataDisks"],
 	            "ipaddress"     => nic["properties"]["privateIPAddress"],
                     "vm_name"       => vm["name"],
-                    "dipaddress"    => vm["tags"]?vm["tags"]["vip"]:nil,
+		    "dipaddress"    => dipaddress,
                     "status"        => vm["properties"]["provisioningState"]
 			   }
     end
 
     def delete(instance_id)
        shutdown(instance_id)
-       invoke_auzre_js_with_id(["delete",instance_id,"Microsoft.Compute/virtualMachines"],logger)
-       invoke_auzre_js_with_id(["delete",instance_id,"Microsoft.Network/loadBalancers"],logger)
-       invoke_auzre_js_with_id(["delete",instance_id,"Microsoft.Network/networkInterfaces"],logger)
+       invoke_azure_js_with_id(["delete",instance_id,"Microsoft.Compute/virtualMachines"],logger)
+       invoke_azure_js_with_id(["delete",instance_id,"microsoft.network/loadBalancers"],logger)
+       invoke_azure_js_with_id(["delete",instance_id,"Microsoft.Network/networkInterfaces"],logger)
+       invoke_azure_js_with_id(["delete",instance_id,"Microsoft.Network/publicIPAddresses"],logger)
     end
 
     def reboot(instance_id)
-       invoke_auzre_js_with_id(["reboot",instance_id],logger)
+       invoke_azure_js_with_id(["reboot",instance_id],logger)
     end
 
     def start(instance_id)
-       invoke_auzre_js_with_id(["start",instance_id],logger)
+       invoke_azure_js_with_id(["start",instance_id],logger)
     end
 
     def shutdown(instance_id)
-       invoke_auzre_js_with_id(["stop",instance_id],logger)
+       invoke_azure_js_with_id(["stop",instance_id],logger)
     end
     def set_tag(instance_id,tag)
        tagStr = ""
        tag.each do |i| tagStr<<"#{i[0]}=#{i[1]};" end    
        tagStr = tagStr[0..-2]
-       invoke_auzre_js_with_id(["setTag",instance_id,"Microsoft.Compute/virtualMachines",tagStr],logger)
+       invoke_azure_js_with_id(["setTag",instance_id,"Microsoft.Compute/virtualMachines",tagStr],logger)
     end
     def instance_id(wala_lib_path)
        contents = File.open(wala_lib_path + "/SharedConfig.xml", "r"){ |file| file.read }
@@ -122,13 +137,13 @@ module Bosh::AzureCloud
     # @return [String] volume name. "/dev/sd[c-r]"
     def attach_disk(instance_id, disk_name)
        disk_uri= @disk_manager.get_disk_uri(disk_name)
-       invoke_auzre_js_with_id(["adddisk",instance_id,disk_uri],logger)
+       invoke_azure_js_with_id(["adddisk",instance_id,disk_uri],logger)
        get_volume_name(instance_id, disk_uri)
     end
     
     def detach_disk(instance_id, disk_name)
         disk_uri= @disk_manager.get_disk_uri(disk_name)
-        invoke_auzre_js_with_id(["rmdisk",instance_id,disk_uri],logger)
+        invoke_azure_js_with_id(["rmdisk",instance_id,disk_uri],logger)
     end
     
     def get_disks(instance_id)

@@ -35,7 +35,7 @@ module Bosh::AzureCloud
     end
 
    
-    def invoke_auzre_js(args,logger,abort_on_error=true)
+    def invoke_azure_js(args,logger,abort_on_error=true)
       node_js_file = File.join(File.dirname(__FILE__),"azure_crp","azure_crp_compute.js")
       cmd = "node #{node_js_file}".split(" ")
       cmd.concat(args)
@@ -74,15 +74,15 @@ module Bosh::AzureCloud
       }
     end
 
-    def invoke_auzre_js_with_id(arg,logger)
+    def invoke_azure_js_with_id(arg,logger)
         task =arg[0]
         id = arg[1]
-        logger.info("invoke azure js "+task)
+        logger.info("invoke azure js "+task+"id"+String(id))
         begin
-           #(__bosh-qingfu3-bm-0458d6c4-6534-4724-81f1-d71e50df778fService&_bosh-qingfu3-bm-0458d6c4-6534-4724-81f1-d71e50df778f
-            resource_group_name = id.split('&')[0][7..-48]
+           #bosh-qingfu3-bm-0458d6c4-6534-4724-81f1-d71e50df778f
+            resource_group_name = id[5..-41]
             logger.debug("resource_group_name is" +resource_group_name)
-            return invoke_auzre_js(["-t",task,"-r",resource_group_name,id.split('&')[1][1..-1]].concat(arg[2..-1]),logger)
+            return invoke_azure_js(["-t",task,"-r",resource_group_name,id].concat(arg[2..-1]),logger)
         rescue Exception => ex
             puts("error:"+ex.message+ex.backtrace.join("\n"))
         end

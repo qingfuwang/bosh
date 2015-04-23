@@ -7,7 +7,7 @@ var argv = require('optimist').usage('node azure_vm_op.js -r resourcegroup -t ta
     .describe('r', 'resource group name')
     .describe('t', 'task name')
     .argv;
-var parallelLimit = 5;
+var parallelLimit = 10;
 var RETRY = {
     "RETRY": "RETRY"
 };
@@ -15,7 +15,7 @@ var ABORT = {
     "ABORT": "ABORT"
 };
 var api_version = "2014-12-01-preview";
-
+var get_log_api_version = "2014-04-01-preview"
 var _resultStr = [];
 var _logStr = [];
 
@@ -36,12 +36,12 @@ function addRetry(task, retries) {
     return task.map(function(t) {
         return function(callback) {
             var operation = retry.operation({
-                maxTimeout: 60*1000,
-                retries:retries
+                maxTimeout: 60 * 1000,
+                retries: retries
             });
             operation.attempt(function(currentAttempt) {
                 try {
-                      t(function(err, msg) {
+                    t(function(err, msg) {
                         if (err == RETRY && operation.retry(err)) {
                             _log("Retry " + currentAttempt + ":" + msg);
                         }
@@ -85,6 +85,10 @@ var azureCommand = function(p, callback) {
                 docommandcb(RETRY, "do command retry not receive resposne " + JSON.stringify(p));
                 return;
             }
+            if (stderr.match(/^An error has occurred/)) {
+                docommandcb(RETRY, "unknow error happens " + JSON.stringify(p));
+                return;
+            }
             docommandcb(err == null ? stderr : err, stdout + stderr);
             //TODO,fire retry event in some scenario
             //callback(RETRY,stdout+stderr)
@@ -111,7 +115,7 @@ var NatRule = {
     }
 }
 var NatRuleRef = {
-    "id":""
+    "id": ""
 }
 
 var formatParameter = function(templatefile, paramters) {
@@ -126,9 +130,9 @@ var formatParameter = function(templatefile, paramters) {
             var lbName = paramters["lbName"];
             var nicName = paramters["nicName"];
             paramters[key].split(",").forEach(function(p) {
-                p=p.trim()
+                p = p.trim()
                 frontport = p.split(":")[0];
-                endport =  p.split(":")[1];
+                endport = p.split(":")[1];
                 NatRule.properties.frontendIPConfiguration = {
                     "id": "/subscriptions/" + paramters.sid + "/resourceGroups/" + paramters.rgname + "/providers/Microsoft.Network/loadBalancers/" + lbName + "/frontendIPConfigurations/LBFE"
                 };
@@ -138,7 +142,7 @@ var formatParameter = function(templatefile, paramters) {
                 NatRule.properties.frontendPort = frontport;
                 NatRule.properties.backendPort = endport;
                 paramters["NatRules"].push(JSON.parse(JSON.stringify(NatRule)));
-                NatRuleRef.id = "/subscriptions/" + paramters.sid + "/resourceGroups/" + paramters.rgname + "/providers/Microsoft.Network/loadBalancers/" + lbName + "/inboundNatRules/"+NatRule.name 
+                NatRuleRef.id = "/subscriptions/" + paramters.sid + "/resourceGroups/" + paramters.rgname + "/providers/Microsoft.Network/loadBalancers/" + lbName + "/inboundNatRules/" + NatRule.name
                 paramters["NatRulesRef"].push(JSON.parse(JSON.stringify(NatRuleRef)));
             });
         }
@@ -160,23 +164,22 @@ var doDeploy = function(resourcegroup, templatefile, paramters, deployname, sid,
     paramters.sid = sid;
     paramters.rgname = resourcegroup;
 
-    azureCommand(["group", "deployment", "create","-s",paramters.StorageAccountName,"-g", resourcegroup, "-n", deployname.id, "-f", templatefile, "-p", formatParameter(templatefile, paramters)], finishedCallback);
+    azureCommand(["group", "deployment", "create", "-s", paramters.StorageAccountName, "-g", resourcegroup, "-n", deployname.id, "-f", templatefile, "-p", formatParameter(templatefile, paramters)], finishedCallback);
 };
 
 
 var waitDeploymentSuccess = function(doDeployTask, id, resourcegroup, deploymentname, finishedCallback) {
-    if(!deploymentname.id)
-    {
-      deploymentname.id=String((new Date).getTime()) + "deploy"
+    if (!deploymentname.id) {
+        deploymentname.id = String((new Date).getTime()) + "deploy"
     }
-    doAzureResourceManage(id, resourcegroup, "/deployments/" + deploymentname.id, "", "GET", "2014-04-01-preview",
+    doAzureResourceManage(id, resourcegroup, "/deployments/" + deploymentname.id, "", "GET", get_log_api_version,
         function(err, msg) {
             if (err) {
                 if (err.code == "DeploymentNotFound") {
                     doDeployTask(function(err, msg) {
                         if (err) {
                             finishedCallback(err, msg);
-                            return ;
+                            return;
                         }
                         finishedCallback(RETRY, "deployment not started, retry");
                     })
@@ -198,30 +201,30 @@ var waitDeploymentSuccess = function(doDeployTask, id, resourcegroup, deployment
                     finishedCallback(null, "Deploy  succeeded");
                     break;
                 case "Failed":
-                    _log("deployment failed try to will collect  log after 30 seconds");
-                 setTimeout(function(){
-                    azureCommand(["group", "log", "show", "-n", resourcegroup, "-d", deploymentname.id,"--json"],
-                        function(err, msg) {
-                            if (err) {
-                                finishedCallback(err, msg);
-                                return ;
-                            }
-                            err_msg = ""
-                            JSON.parse(msg).forEach(function(t){
-                                                       if(t.properties.statusMessage)
-                                                          err_msg+=JSON.stringify(t.properties.statusMessage)
-                                                       })
+                    _log("deployment failed  collect  log after 30 seconds");
+                    setTimeout(function() {
+                        azureCommand(["group", "log", "show", "-n", resourcegroup, "-d", deploymentname.id, "--json"],
+                            function(err, msg) {
+                                if (err) {
+                                    finishedCallback(err, msg);
+                                    return;
+                                }
+                                err_msg = ""
+                                JSON.parse(msg).forEach(function(t) {
+                                    if (t.properties.statusMessage)
+                                        err_msg += JSON.stringify(t.properties.statusMessage)
+                                })
 
-                            if (err_msg.indexOf("NetworkingInternalOperationError") > -1) {
-                                       deploymentname.id = null;
-                                       _log("Failed "+err_msg)
-                                       finishedCallback(RETRY, "Retry internal error");
-                            }
-                            else {
-                                finishedCallback(ABORT, "deployment failed " + err_msg);
-                            }
-                        });
-                    },30000);
+                                if (err_msg.indexOf("NetworkingInternalOperationError") > -1) {
+                                    deploymentname.id = null;
+                                    _log("Failed " + err_msg)
+                                    finishedCallback(RETRY, "Retry internal error");
+                                }
+                                else {
+                                    finishedCallback(ABORT, "deployment failed " + err_msg);
+                                }
+                            });
+                    }, 30000);
                     break;
                 default:
                     finishedCallback(ABORT, "unknow stat:" + provisioningState);
@@ -248,7 +251,7 @@ var findResource = function(resourcegroup, type, propertyId, value, REFresource,
                 var domainnames = JSON.parse(msg);
                 var query_task = domainnames.map(function(n) {
                     return function(callback) {
-                        azureCommand(["resource", "show", "-g", resourcegroup, n.name, n.type, api_version, "--json"],
+                        getResource(resourcegroup, n.name, n.type,
                             function(err, msg) {
                                 if (err) {
                                     if (msg.indexOf("resource type could not be found") > -1)
@@ -258,7 +261,7 @@ var findResource = function(resourcegroup, type, propertyId, value, REFresource,
                                     return;
                                 }
                                 else {
-                                    var o = JSON.parse(msg);
+                                    var o = msg;
                                     var properties = propertyId.split(":")
                                     for (var i = 0; i < properties.length; i++) {
                                         if (o[properties[i]]) {
@@ -291,20 +294,24 @@ var findResource = function(resourcegroup, type, propertyId, value, REFresource,
         });
 };
 
-var waitVMupdated = function(resourcegroup, vmname, finishedCallback) {
-    var vm = {};
-    getResource(resourcegroup, vmname, "Microsoft.Compute/virtualMachines", vm, function(err, msg) {
+var waitResourceupdated = function(resourcegroup, name, type, finishedCallback) {
+
+    getResource(resourcegroup, name, type, function(err, result) {
         if (err == RETRY) {
-            finishedCallback(RETRY, msg);
+            finishedCallback(RETRY, result);
             return;
         }
-        if (vm.properties.provisioningState == "updating") {
+        if (result.properties.provisioningState == "updating") {
             finishedCallback(RETRY, "wait for vm state to be succeeded");
         }
         else {
-            finishedCallback(null, "vm provision finished "+vm.properties.provisioningState);
+            finishedCallback(null, "vm provision finished " + result.properties.provisioningState);
         }
     });
+};
+
+var waitVMupdated = function(resourcegroup, vmname, finishedCallback) {
+    waitResourceupdated(resourcegroup, vmname, "Microsoft.Compute/virtualMachines", finishedCallback);
 };
 
 var deleteResource = function(resourcegroup, name, type, finishedCallback) {
@@ -322,16 +329,19 @@ var deleteResource = function(resourcegroup, name, type, finishedCallback) {
 };
 
 
-var getResource = function(resourcegroup, name, type, REFresult, finishedCallback) {
-    azureCommand(["resource", "show", resourcegroup, name, type, api_version, "--json"],
+var getResource = function(resourcegroup, name, type, finishedCallback) {
+  getCurrentSubscription({"id":""},function(err,id){
+  doAzureResourceManage(id, resourcegroup, "/providers/"+type+"/" + name, "", "GET", api_version,
+    //azureCommand(["resource", "show", resourcegroup, name, type, api_version, "--json"],
         function(err, msg) {
             if (!err) {
-                REFresult.properties = JSON.parse(msg).properties;
-                finishedCallback(err, " get resource done");
+                var result = JSON.parse(msg);
+                finishedCallback(err, result);
                 return;
             }
             finishedCallback(err, msg);
         });
+  });
 };
 
 
@@ -368,11 +378,88 @@ var updateTag = function(resourcegroup, name, type, resource, tag, finishedCallb
     ], finishedCallback);
 };
 
+
+var setIPlabelName = function(resourcegroup,  ip, labelname, finishedCallback) {
+
+    azureCommand(["resource", "show", resourcegroup, ip, "Microsoft.Network/publicIPAddresses", api_version, "--json"],
+        function(err, msg) {
+            if (err) {
+                finishedCallback(err, msg);
+                return;
+            }
+            var property = JSON.parse(msg);
+
+            property.properties.dnsSettings = {
+                "domainNameLabel": labelname
+            };
+            delete property.provisioningState
+            delete property.permissions
+            doAzureResourceManage(property.id.split("/")[2], resourcegroup, "/providers/microsoft.network/publicIPAddresses/" + ip, '', 'PUT', api_version, finishedCallback, JSON.stringify(property));
+        });
+        
+};
+var bindIP = function(resourcegroup, nicname, ip, finishedCallback) {
+
+    azureCommand(["resource", "show", resourcegroup, ip, "Microsoft.Network/publicIPAddresses", api_version, "--json"],
+        function(err, msg) {
+            if (err) {
+                finishedCallback(err, msg);
+                return;
+            }
+            var ipconfigid = JSON.parse(msg).id;
+            azureCommand(["resource", "show", resourcegroup, nicname, "Microsoft.Network/networkInterfaces", api_version, "--json"],
+                function(err, msg) {
+                    if (err) {
+                        finishedCallback(err, msg);
+                        return;
+                    }
+                    var property = JSON.parse(msg);
+
+                    property.properties.ipConfigurations[0].properties.publicIPAddress = {
+                        "id": ipconfigid
+                    };
+                    delete property.provisioningState
+                    delete property.permissions
+                    doAzureResourceManage(ipconfigid.split("/")[2], resourcegroup, "/providers/microsoft.network/networkInterfaces/" + nicname, '', 'PUT', api_version, finishedCallback, JSON.stringify(property));
+                });
+        });
+
+};
+
+var addSecurityGroup = function(resourcegroup, nicname, group, finishedCallback) {
+
+    azureCommand(["resource", "show", resourcegroup, group, "Microsoft.Network/networkSecurityGroups", api_version, "--json"],
+        function(err, msg) {
+            if (err) {
+                finishedCallback(err, msg);
+                return;
+            }
+            var id = JSON.parse(msg).id;
+            azureCommand(["resource", "show", resourcegroup, nicname, "Microsoft.Network/networkInterfaces", api_version, "--json"],
+                function(err, msg) {
+                    if (err) {
+                        finishedCallback(err, msg);
+                        return;
+                    }
+                    var property = JSON.parse(msg);
+
+                    property.properties.networkSecurityGroup= {
+                        "id": id
+                    };
+                    delete property.provisioningState
+                    delete property.permissions
+                    doAzureResourceManage(id.split("/")[2], resourcegroup, "/providers/microsoft.network/networkInterfaces/" + nicname, '', 'PUT', api_version, finishedCallback, JSON.stringify(property));
+                });
+        });
+
+};
+
+
 var dettachVMDisk = function(resourcegroup, vmname, vm, vhd, finishedCallback) {
     var property = vm.properties;
     _log("remove" + vhd);
     var newdisks = property.storageProfile.dataDisks.filter(function(d) {
-        return d.vhd.uri.indexOf(vhd) == -1 ;
+        return d.vhd.uri.indexOf(vhd) == -1;
     });
     property.storageProfile.dataDisks = newdisks;
     azureCommand(["resource", "set", resourcegroup, vmname, "Microsoft.Compute/virtualMachines",
@@ -380,22 +467,20 @@ var dettachVMDisk = function(resourcegroup, vmname, vm, vhd, finishedCallback) {
     ], finishedCallback);
 };
 
-
+var HOMEDIR = process.env[(process.platform == 'win32') ? 'USERPROFILE' : 'HOME'];
 var getToken = function(subscriptionId) {
-    var homedir =process.env[(process.platform == 'win32') ? 'USERPROFILE' : 'HOME'];
-    var accessTokenPath = path.join(homedir,".azure/accessTokens.json")
-    if(fs.existsSync(accessTokenPath))
-    {
+    var accessTokenPath = path.join(HOMEDIR, ".azure/accessTokens.json")
+    if (fs.existsSync(accessTokenPath)) {
         var token = fs.readFileSync(accessTokenPath);
-         token = JSON.parse(String(token));
-         return token.filter(function(t) {
+        token = JSON.parse(String(token));
+        return token.filter(function(t) {
             return Date.parse(t.expiresOn) - (new Date()) > 0;
         });
-    }else
-    {
-         var token = fs.readFileSync(path.join(homedir,".azure/azureProfile.json"));
-          token = JSON.parse(String(token)).subscriptions;
-         return token.filter(function(t) {
+    }
+    else {
+        var token = fs.readFileSync(path.join(HOMEDIR, ".azure/azureProfile.json"));
+        token = JSON.parse(String(token)).subscriptions;
+        return token.filter(function(t) {
             return t.isDefault && Date.parse(t.accessToken.expiresAt) - (new Date()) > 0;
         });
     }
@@ -413,6 +498,18 @@ var refreshTokenTask = function(finishedCallback) {
 };
 
 var getCurrentSubscription = function(subscriptionId, finishedCallback) {
+    var profilePath = path.join(HOMEDIR, ".azure/azureProfile.json")
+    if (fs.existsSync(profilePath)) {
+        var sb = fs.readFileSync(profilePath);
+        sb = JSON.parse(String(sb));
+        if(sb.subscriptions){
+           subscriptionId.id= sb.subscriptions.filter(function(t) {
+            return t.isDefault == true;
+          })[0].id;
+         finishedCallback(null, subscriptionId.id);
+         return 
+       }
+    }
     azureCommand(["account", "list", "--json"], function(err, msg) {
         if (err) {
             finishedCallback(err, msg);
@@ -421,7 +518,7 @@ var getCurrentSubscription = function(subscriptionId, finishedCallback) {
             subscriptionId.id = JSON.parse(msg).filter(function(t) {
                 return t.isDefault == true;
             })[0].id;
-            finishedCallback(null, "");
+            finishedCallback(null, subscriptionId.id);
         }
     });
 };
@@ -437,40 +534,51 @@ var doStorageAccontTask = function(subscriptionId, resourcegroup, name, op, meth
     doAzureResourceManage(subscriptionId, resourcegroup, '/providers/Microsoft.Storage/storageAccounts/' + name + "/", op, method, api_version, finishedCallback)
 }
 
-var doAzureResourceManage = function(subscriptionId, resourcegroup, name, op, method, api_version, finishedCallback) {
+var doAzureResourceManage = function(subscriptionId, resourcegroup, name, op, method, api_version, finishedCallback, body) {
     //console.log(process.argv)
 
-    //https: //management.azure.com/subscriptions/4be8920b-2978-43d7-ab14-04d8549c1d05/resourceGroups/qingfu2/providers/Microsoft.Storage/storageAccounts/qingfustorage2/listKeys?api-version=2014-12-01-preview
-
+    //https: //management.azure.com/subscriptions/xxx/resourceGroups/xx/providers/Microsoft.Storage/storageAccounts/xx/listKeys?api-version=2014-12-01-preview
+    var body_content = '{}'
+    if (typeof(body) != 'undefined' && body) {
+        body_content = body
+    }
     var WebResource = common.WebResource;
     var httpRequest = new WebResource();
     httpRequest.method = method;
     httpRequest.headers = {};
     httpRequest.headers['Content-Type'] = 'application/json; charset=utf-8';
-    httpRequest.url = 'https://management.azure.com/subscriptions/' + subscriptionId + '/resourceGroups/' + resourcegroup + '/' + name + '/' + op;
+    httpRequest.url = 'https://management.azure.com/subscriptions/' + subscriptionId + '/resourceGroups/' + resourcegroup + '/' + name+"/" ;
+    if(op&&op.length>0)
+    httpRequest.url +=op
     var queryParameters = [];
     queryParameters.push('api-version=' + (api_version));
     if (queryParameters.length > 0) {
         httpRequest.url = httpRequest.url + '?' + queryParameters.join('&');
     }
+    _log(httpRequest.url)
     httpRequest.headers['x-ms-version'] = '2014-04-01-preview';
-    if (method == 'POST') {
-        httpRequest.body = "{}";
+    if (method == 'POST' || method == 'PUT') {
+        httpRequest.body = body_content;
     }
-    var token = getToken()[0].accessToken;
-    if((typeof token) != "string")
-    {
-        token = token.accessToken;
-    }
-    var resourceManagementClient = resourceManagement.createResourceManagementClient(
+
+    var restapi_task = function(bk){
+      var token = getToken()[0].accessToken;
+        if ((typeof token) != "string") {
+          token = token.accessToken;
+      }
+      var resourceManagementClient = resourceManagement.createResourceManagementClient(
         new common.TokenCloudCredentials({
             subscriptionId: subscriptionId,
             token: token
         }));
-
-    resourceManagementClient.pipeline(httpRequest, function(err, response, body) {
-        finishedCallback(err, body);
-    });
+    
+      resourceManagementClient.pipeline(httpRequest, function(err, response, body) {
+          bk(err, body);
+      });
+    }
+    dotask = addRetry([restapi_task], 10)[0];
+    dotask(finishedCallback);
+     
 };
 
 var main = function() {
@@ -499,17 +607,16 @@ var main = function() {
 
             tasks.push(function(callback) {
                 var paramters = argv._[1];
-                if(fs.existsSync(paramters)) {
-                     paramters = fs.readFileSync(paramters);
+                if (fs.existsSync(paramters)) {
+                    paramters = fs.readFileSync(paramters);
                 }
                 else {
-                 paramters = new Buffer(paramters, 'base64').toString('utf-8');
+                    paramters = new Buffer(paramters, 'base64').toString('utf-8');
                 }
                 paramters = JSON.parse(paramters);
-                if(!fs.existsSync(template))
-                {
-                    callback(ABORT,"no such file or directory  "+template);
-                    return ;
+                if (!fs.existsSync(template)) {
+                    callback(ABORT, "no such file or directory  " + template);
+                    return;
                 }
                 waitDeploymentSuccess(function(cb) {
                     doDeploy(resourcegroup, template, paramters, deployname, subscriptionId.id, cb);
@@ -523,7 +630,12 @@ var main = function() {
             var resource = {};
             tasks.push(
                 function(callback) {
-                    getResource(resourcegroup, resourcename, resourcetype, resource, callback);
+                    getResource(resourcegroup, resourcename, resourcetype, function(err, result) {
+                        if (!err) {
+                            resource = result;
+                        }
+                        callback(err, result);
+                    });
                 });
             tasks.push(
                 function(callback) {
@@ -600,6 +712,62 @@ var main = function() {
                     })
                 });
             break;
+        case "addsecuritygroup":
+            var nicname = argv._[0];
+            var groupname = argv._[1];
+
+            tasks.push(
+                function(callback) {
+                   addSecurityGroup(resourcegroup, nicname, groupname, callback);
+                }
+            );
+
+            tasks.push(
+                function(callback) {
+                    waitResourceupdated(resourcegroup, nicname, "Microsoft.Network/networkInterfaces", callback);
+                }
+            );
+
+            break;
+        case "bindip":
+            var ipname = argv._[0];
+            var nicname = argv._[1];
+
+            tasks.push(
+                function(callback) {
+                    bindIP(resourcegroup, nicname, ipname, callback);
+                }
+            );
+
+            tasks.push(
+                function(callback) {
+                    waitResourceupdated(resourcegroup, nicname, "Microsoft.Network/networkInterfaces", callback);
+                }
+            );
+
+            break;
+         case "createip":
+            var ipname = argv._[0];
+            var labelname = argv._[1];
+            tasks.push( 
+                function(callback) {
+                    azureCommand(["group","list","--json"],function(err,msg){
+                       if(err){callback(err,msg);return}
+                       var location = JSON.parse(msg).filter(function(t){return t.name==resourcegroup})[0].location
+                       azureCommand(["resource","create",resourcegroup,"-n",ipname,"Microsoft.Network/publicIPAddresses",location,"2014-12-01-preview",
+                    "-p",'{}'],callback);
+                    });
+                }
+            );
+            if(labelname&&labelname.length>0)
+            {
+            tasks.push(
+                function(callback) {
+                    setIPlabelName(resourcegroup, ipname, labelname, callback);
+                }
+            );
+            }
+            break;
         case "stop":
         case "start":
         case "restart":
@@ -619,16 +787,27 @@ var main = function() {
             );
 
             break;
+        case "getlocation":
+          tasks.push(
+                function(callback) {
+                    azureCommand(["group","list","--json"],function(err,msg){
+                        if(!err){
+                        var location = JSON.parse(msg).filter(function(t){return t.name==resourcegroup})[0].location;
+                        _result(location);
+                       }
+                        callback(err,"Find resource group");
+                });
+               });
+        break
         case "get":
             var name = argv._[0];
             var type = argv._[1]
-            var resource = {};
 
             tasks.push(
                 function(callback) {
-                    getResource(resourcegroup, name, type, resource, function(error, result) {
+                    getResource(resourcegroup, name, type, function(error, result) {
                         if (!error)
-                            _result(JSON.stringify(resource));
+                            _result(JSON.stringify(result));
                         callback(error, result);
                     });
                 });
@@ -659,7 +838,12 @@ var main = function() {
             var resource = {};
             tasks.push(
                 function(callback) {
-                    getResource(resourcegroup, vmname, "Microsoft.Compute/virtualMachines", resource, callback);
+                    getResource(resourcegroup, vmname, "Microsoft.Compute/virtualMachines", function(err, result) {
+                        if (!err) {
+                            resource = result;
+                        }
+                        callback(err, result);
+                    });
                 });
             tasks.push(
                 function(callback) {
@@ -681,7 +865,12 @@ var main = function() {
             var resource = {};
             tasks.push(
                 function(callback) {
-                    getResource(resourcegroup, vmname, "Microsoft.Compute/virtualMachines", resource, callback);
+                    getResource(resourcegroup, vmname, "Microsoft.Compute/virtualMachines", function(err, result) {
+                        if (!err) {
+                            resource = result;
+                        }
+                        callback(err, result);
+                    });
                 });
 
             tasks.push(
@@ -703,10 +892,9 @@ var main = function() {
 
     }
 
-
-
-    tasks = addRetry(tasks, task == "deploy" ? 60 : 10)
+    tasks = addRetry(tasks, task == "deploy" ? 60 : 20)
     var async = require('async')
+    _log("There are " + tasks.length + " Tasks")
     async.series(tasks,
         function(error, result) {
 
@@ -716,12 +904,12 @@ var main = function() {
             else {
                 _log("Task Finished" + result);
             }
-            console.log("##RESULTBEGIN##")
-            console.log(JSON.stringify({
+            _log("##RESULTBEGIN##")
+            _log(JSON.stringify({
                 "R": _resultStr,
-                "Failed":error
+                "Failed": error
             }));
-            console.log("##RESULTEND##")
+            _log("##RESULTEND##")
         });
 
 
