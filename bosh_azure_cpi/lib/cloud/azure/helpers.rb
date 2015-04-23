@@ -40,7 +40,10 @@ module Bosh::AzureCloud
       cmd = "node #{node_js_file}".split(" ")
       cmd.concat(args)
       result  = {};
-      Open3.popen3(*cmd) {
+      node_path=ENV['NODE_PATH']
+      node_path = "/usr/local/lib/node_modules" if not node_path or node_path.length==0
+      
+      Open3.popen3({'NODE_PATH' =>node_path},*cmd) {
       |stdin, stdout, stderr, wait_thr|
 
             data = ""
