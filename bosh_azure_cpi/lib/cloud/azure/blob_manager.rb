@@ -1,7 +1,6 @@
 module Bosh::AzureCloud
   class BlobManager
     attr_accessor :logger
-    
     include Helpers
     
     VHDBlock = Struct.new(:id, :file_start_range, :size, :blob_start_range, :content)
@@ -29,6 +28,20 @@ module Bosh::AzureCloud
       @blob_service_client.delete_blob(container_name, blob_name, {
         :delete_snapshots => :include
       })
+    end
+
+    def get_blob_uri(container_name,blob_name)
+	return Azure.config.storage_blob_host+"/#{container_name}/"+blob_name
+    end
+
+    def get_blob_size(uri)
+	blob_name = uri.split("/")[4..-1]
+        if blob_name.length>1
+          blob_name = blob_name.join("/")
+        end
+	container = uri.split("/")[3..3]
+	prop =  @blob_service_client.get_blob_properties(container,blob_name)
+	return prop.properties[:content_length]
     end
 
     def delete_blob_snapshot(container_name, blob_name, snapshot_time)

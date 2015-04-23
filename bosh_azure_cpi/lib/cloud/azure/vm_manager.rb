@@ -1,210 +1,159 @@
 module Bosh::AzureCloud
   class VMManager
     attr_accessor :logger
-
     include Helpers
 
     def initialize(storage_manager, registry, disk_manager)
-      cloud_error("registry must not be nil") if registry.nil?
       @storage_manager = storage_manager
       @registry = registry
       @disk_manager = disk_manager
-
-      @azure_cloud_service    = Azure::CloudServiceManagement::CloudServiceManagementService.new
-      @azure_vm_service       = Azure::VirtualMachineManagementService.new
-      @reserved_ip_manager    = Bosh::AzureCloud::ReservedIpManager.new
-      @affinity_group_manager = Bosh::AzureCloud::AffinityGroupManager.new
-
       @logger = Bosh::Clouds::Config.logger
     end
 
     def create(uuid, stemcell, cloud_opts, network_configurator, resource_pool)
-      logger.info("create(#{uuid}, #{stemcell}...)")
+      cloud_error("resource_group_name required for deployment")  if cloud_opts["resource_group_name"]==nil
+      instanceid = "bosh-#{cloud_opts["resource_group_name"]}-#{uuid}"
+      imageUri = @disk_manager.get_stemcell_uri(stemcell+".vhd")
+      osvhdUri = @disk_manager.get_new_osdisk_uri(instanceid)
+      sshKeyData = File.read(cloud_opts['ssh_certificate_file'])
+      location = invoke_azure_js("-t getlocation -r #{cloud_opts['resource_group_name']}".split(" "),logger)
       params = {
-          :vm_name             => "bosh-vm-#{uuid}",
-          :vm_user             => cloud_opts['ssh_user'],
-          :image               => stemcell,
-          :affinity_group_name => cloud_opts['affinity_group_name'],
+          :vmName              => instanceid,
+          :nicName             => instanceid,
+          :adminUserName       => cloud_opts['ssh_user'],
+          :imageUri            => imageUri,
+          :osvhdUri            => osvhdUri,
+          :location            => location,
+          :vmSize              => resource_pool['instance_type'],
+          :storageAccountName  => @storage_manager.get_storage_account_name,
+          :customData          => get_user_data(instanceid, network_configurator.dns),
+          :sshKeyData          => sshKeyData
       }
+        params[:virtualNetworkName] = network_configurator.virtual_network_name
+        params[:subnetName]          = network_configurator.subnet_name
 
-      opts = {
-          :cloud_service_name   => "bosh-service-#{uuid}",
-          :storage_account_name => @storage_manager.get_storage_account_name,
-          :vm_size              => resource_pool['instance_type'] || 'Small',
-          :certificate_file     => cloud_opts['ssh_certificate_file'],
-          :private_key_file     => cloud_opts['ssh_private_key_file']
-      }
-
-      if !network_configurator.vip_network.nil?
-        affinity_group = @affinity_group_manager.get_affinity_group(cloud_opts["affinity_group_name"])
-
-        reserved_ip = @reserved_ip_manager.find(network_configurator.reserved_ip)
-
-        raise "Given reserved ip does not exist" if reserved_ip.nil?
-        raise "Given reserved ip #{reserved_ip[:location]} does not belong to the location #{affinity_group.location}" unless reserved_ip[:location] == affinity_group.location
-        raise "Given reserved ip #{reserved_ip} is in use" if reserved_ip[:in_use]
-
-        logger.debug("reserved ip: #{reserved_ip}")
-        opts[:reserved_ip_name] = reserved_ip[:name]
+      unless network_configurator.private_ip.nil?
+          params[:privateIPAddress] = network_configurator.private_ip
+          params[:privateIPAddressType] = "Static"
       end
+      default_security_groupname = "bosh"
+      args = "-t deploy -r #{cloud_opts['resource_group_name']}".split(" ")      
+      args.push(File.join(File.dirname(__FILE__),"azure_crp","azure_vm.json"))
+      args.push(Base64.encode64(params.to_json()))
+      result = 'OK'
+      result = invoke_azure_js(args,logger)
+      network_property = network_configurator.network.spec["cloud_properties"] 
+      if !network_configurator.vip_network.nil? and result
+           ip_crp_template = 'azure_vm_endpoints.json' 
+           ipname = invoke_azure_js("-r #{cloud_opts['resource_group_name']} -t findResource properties:ipAddress  #{network_configurator.reserved_ip} Microsoft.Network/publicIPAddresses".split(" "),logger)
+           #if vip is not a reserved ip, then create an ipaddress with given label name
+           #add nic to 'bosh' network security group,ignore error
+           if ipname==nil || ipname.length==0 
+               logger.debug(network_configurator.reserved_ip+" is not a reserved ip , go to create ip and take it as fqdn name")
+               ipname = instanceid;
+               invoke_azure_js("-r #{cloud_opts['resource_group_name']} -t createip #{ipname}  #{network_configurator.reserved_ip.split(".")[0].split("/")[-1]}".split(" "),logger)
+               ip_crp_template = "azure_vm_ip.json"
+               invoke_azure_js("-r #{cloud_opts['resource_group_name']} -t addsecuritygroup #{ipname} #{default_security_groupname}".split(" "),logger)
+           end
 
-      if (network_configurator.vnet?)
-        opts[:virtual_network_name] = network_configurator.virtual_network_name
-        opts[:subnet_name]          = network_configurator.subnet_name
+           #bind the ip or endpoint to nic of that vm
+           p = {"StorageAccountName"      => @storage_manager.get_storage_account_name,
+              "lbName"                  => network_property['load_balance_name']?network_property['load_balance_name']:instanceid,
+              "publicIPAddressName"     =>ipname,
+              "nicName"                 =>instanceid,
+              "virtualNetworkName"      =>"vnet",
+              "TcpEndPoints"            => network_configurator.tcp_endpoints,
+              "UdpEndPoints"            =>network_configurator.udp_endpoints
+            }
 
-        unless network_configurator.private_ip.nil?
-          opts[:static_virtual_network_ipaddress] = network_configurator.private_ip
-        end
+          p = p.merge(params)
+          args = "-t deploy -r #{cloud_opts["resource_group_name"]}  ".split(" ")      
+          args.push(File.join(File.dirname(__FILE__),"azure_crp",ip_crp_template))
+          args.push(Base64.encode64(p.to_json()))
+          result = invoke_azure_js(args,logger)
+          #set_tag(instanceid,{"vip" => network_configurator.reserved_ip})
       end
-
-      opts[:tcp_endpoints] = network_configurator.tcp_endpoints
-      opts[:udp_endpoints] = network_configurator.udp_endpoints
-
-      params[:custom_data] = get_user_data(params[:vm_name], network_configurator.dns)
-
-      logger.debug("params: #{params}")
-      logger.debug("opts: #{opts}")
-
-      result = nil
-      retry_azure_operation do
-        result = @azure_vm_service.create_virtual_machine(params, opts)
-
-        if result.is_a? String
-          if result.include?("ConflictError") || result.include?("TooManyRequests")
-            raise result
-          else
-            raise "Retry to create(#{uuid})"
-          end
-        end
-      end
-
-      if result.is_a? String
-        logger.error("Failed to create vm: #{result}")
-        @azure_cloud_service.delete_cloud_service(opts[:cloud_service_name]) if @azure_cloud_service.get_cloud_service(opts[:cloud_service_name])
-        cloud_error("vm_manager.create: #{result}")
-      end
-
-      result
+      if not result
+         delete(instanceid)
+         cloud_error("create vm failed")        
+      end 
+      return instanceid if result
+      
     end
 
+    
     def find(instance_id)
-      logger.debug("find(#{instance_id})")
-      cloud_service_name, vm_name = parse_instance_id(instance_id)
-      @azure_vm_service.get_virtual_machine(vm_name, cloud_service_name)
+       vm= JSON(invoke_azure_js_with_id(["get",instance_id,"Microsoft.Compute/virtualMachines"],logger))
+       publicip = invoke_azure_js_with_id(["get",instance_id,"Microsoft.Network/publicIPAddresses"],logger)
+       publicip = JSON(publicip) if publicip
+       dipaddress = (publicip!=nil)?publicip["properties"]["ipAddress"]:nil;
+       
+       nic = JSON(invoke_azure_js_with_id(["get",instance_id,"Microsoft.Network/networkInterfaces"],logger))["properties"]["ipConfigurations"][0]
+       return {
+	            "data_disks"    => vm["properties"]["storageProfile"]["dataDisks"],
+	            "ipaddress"     => nic["properties"]["privateIPAddress"],
+                    "vm_name"       => vm["name"],
+		    "dipaddress"    => dipaddress,
+                    "status"        => vm["properties"]["provisioningState"]
+			   }
     end
 
     def delete(instance_id)
-      logger.debug("delete(#{instance_id})")
-      cloud_service_name, vm_name = parse_instance_id(instance_id)
-
-      begin
-        @azure_vm_service.shutdown_virtual_machine(vm_name, cloud_service_name)
-      rescue
-      end
-
-      retry_azure_operation { handle_response http_delete("services/hostedservices/#{cloud_service_name}?comp=media") }
+       shutdown(instance_id)
+       invoke_azure_js_with_id(["delete",instance_id,"Microsoft.Compute/virtualMachines"],logger)
+       invoke_azure_js_with_id(["delete",instance_id,"microsoft.network/loadBalancers"],logger)
+       invoke_azure_js_with_id(["delete",instance_id,"Microsoft.Network/networkInterfaces"],logger)
+       invoke_azure_js_with_id(["delete",instance_id,"Microsoft.Network/publicIPAddresses"],logger)
     end
 
     def reboot(instance_id)
-      logger.debug("reboot(#{instance_id})")
-      cloud_service_name, vm_name = parse_instance_id(instance_id)
-      @azure_vm_service.restart_virtual_machine(vm_name, cloud_service_name)
+       invoke_azure_js_with_id(["reboot",instance_id],logger)
+    end
+
+    def start(instance_id)
+       invoke_azure_js_with_id(["start",instance_id],logger)
     end
 
     def shutdown(instance_id)
-      logger.debug("shutdown(#{instance_id})")
-      cloud_service_name, vm_name = parse_instance_id(instance_id)
-      @azure_vm_service.shutdown_virtual_machine(vm_name, cloud_service_name)
+       invoke_azure_js_with_id(["stop",instance_id],logger)
     end
-
+    def set_tag(instance_id,tag)
+       tagStr = ""
+       tag.each do |i| tagStr<<"#{i[0]}=#{i[1]};" end    
+       tagStr = tagStr[0..-2]
+       invoke_azure_js_with_id(["setTag",instance_id,"Microsoft.Compute/virtualMachines",tagStr],logger)
+    end
     def instance_id(wala_lib_path)
-      logger.debug("instance_id(#{wala_lib_path})")
-      contents = File.open(wala_lib_path + "/SharedConfig.xml", "r"){ |file| file.read }
-
-      service_name = contents.match("^*<Service name=\"(.*)\" guid=\"{[-0-9a-fA-F]+}\"[\\s]*/>")[1]
-      vm_name = contents.match("^*<Incarnation number=\"\\d*\" instance=\"(.*)\" guid=\"{[-0-9a-fA-F]+}\"[\\s]*/>")[1]
-
-      generate_instance_id(service_name, vm_name)
+       contents = File.open(wala_lib_path + "/SharedConfig.xml", "r"){ |file| file.read }
+       vm_name = contents.match("^*<Incarnation number=\"\\d*\" instance=\"(.*)\" guid=\"{[-0-9a-fA-F]+}\"[\\s]*/>")[1]
+       generate_instance_id(vm_name,"")
     end
-
+    
     ##
-    # Attach a disk to the VM
+    # Attach a disk to the Vm
     #
     # @param [String] instance_id Instance id
     # @param [String] disk_name disk name
     # @return [String] volume name. "/dev/sd[c-r]"
     def attach_disk(instance_id, disk_name)
-      logger.debug("attach_disk(#{instance_id}, #{disk_name})")
-      vm = find(instance_id) || cloud_error('Given instance id does not exist')
-
-      cloud_service_name, vm_name = parse_instance_id(instance_id)
-
-      next_disk_lun = vm.data_disks.size
-      options = {
-          :import => true,
-          :disk_name => disk_name,
-          :host_caching => 'ReadOnly',
-          :disk_label => 'bosh',
-          :lun => next_disk_lun
-      }
-      @azure_vm_service.add_data_disk(vm_name, cloud_service_name, options)
-
-      disks_size = next_disk_lun
-      until disks_size > next_disk_lun do
-        sleep(5)
-        vm = find(instance_id)
-        disks_size = vm.data_disks.size
-      end
-
-      get_volume_name(instance_id, disk_name)
+       disk_uri= @disk_manager.get_disk_uri(disk_name)
+       invoke_azure_js_with_id(["adddisk",instance_id,disk_uri],logger)
+       get_volume_name(instance_id, disk_uri)
     end
-
+    
     def detach_disk(instance_id, disk_name)
-      logger.debug("detach_disk(#{instance_id}, #{disk_name})")
-      vm = find(instance_id) || cloud_error('Given instance id does not exist')
-
-      cloud_service_name, vm_name = parse_instance_id(instance_id)
-
-      data_disk = vm.data_disks.find { |disk| disk[:name] == disk_name}
-      data_disk || cloud_error('Given disk name is not attached to given instance id')
-
-      lun = get_disk_lun(data_disk)
-
-      retry_azure_operation { handle_response http_delete("services/hostedservices/#{cloud_service_name}/deployments/#{vm.deployment_name}/"\
-                             "roles/#{vm_name}/DataDisks/#{lun}")}
-
-      current_disks_size = vm.data_disks.size
-      disks_size = current_disks_size
-      until disks_size < current_disks_size do
-        sleep(5)
-        vm = find(instance_id)
-        disks_size = vm.data_disks.size
-      end
+        disk_uri= @disk_manager.get_disk_uri(disk_name)
+        invoke_azure_js_with_id(["rmdisk",instance_id,disk_uri],logger)
     end
-
+    
     def get_disks(instance_id)
       logger.debug("get_disks(#{instance_id})")
       vm = find(instance_id) || cloud_error('Given instance id does not exist')
-
       data_disks = []
       vm.data_disks.each do |disk|
         data_disks << disk[:name]
       end
-
       data_disks
-    end
-
-    def servers
-      instances = []
-      storage_affinity_group = @storage_manager.get_storage_affinity_group
-
-      services = @azure_cloud_service.list_cloud_services
-      services.each do |service|
-        if storage_affinity_group == service.affinity_group && service.name.start_with?('bosh-service')
-          instances << generate_instance_id(service.name, "bosh-vm#{service.name[12..-1]}")
-        end
-      end
-      instances
     end
 
     private
@@ -213,23 +162,21 @@ module Bosh::AzureCloud
       user_data = {registry: {endpoint: @registry.endpoint}}
       user_data[:server] = {name: vm_name}
       user_data[:dns] = {nameserver: dns} if dns
-
       Base64.strict_encode64(Yajl::Encoder.encode(user_data))
     end
-
+    
     def get_volume_name(instance_id, disk_name)
-      vm = find(instance_id) || cloud_error('Given instance id does not exist')
-
-      data_disk = vm.data_disks.find { |disk| disk[:name] == disk_name}
+      data_disk = find(instance_id)["data_disks"].find { |disk| disk["vhd"]["uri"] == disk_name}
       data_disk || cloud_error('Given disk name is not attached to given instance id')
-
       lun = get_disk_lun(data_disk)
-
+      logger.info("get_volume_name return lun #{lun}")
       "/dev/sd#{('c'.ord + lun).chr}"
     end
-
+    
     def get_disk_lun(data_disk)
-      data_disk[:lun] != "" ? data_disk[:lun].to_i : 0
+      data_disk["lun"] != "" ? data_disk["lun"].to_i : 0
     end
+    
   end
 end
+

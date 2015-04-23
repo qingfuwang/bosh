@@ -95,18 +95,16 @@ module Bosh::AzureCloud
       with_thread_name("create_vm(#{agent_id}, ...)") do
         begin
           raise "Given stemcell '#{stemcell_id}' does not exist" unless @azure.stemcell_manager.has_stemcell?(stemcell_id)
-
+      #    agent_id = 'bm-4c1ebe45-f384-4ae2-a9bd-273cacb5687c'
           instance = @azure.vm_manager.create(
             agent_id,
             stemcell_id,
             azure_properties,
             NetworkConfigurator.new(networks),
             resource_pool)
-
-          instance_id = generate_instance_id(instance.cloud_service_name, instance.vm_name)
+           instance_id = instance
 
           logger.info("Created new instance '#{instance_id}'")
-
           unless disk_locality.nil?
             logger.info("Attach disks to the new instance")
             disk_locality.each do |disk_id|

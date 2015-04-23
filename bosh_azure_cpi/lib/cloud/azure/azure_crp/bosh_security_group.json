@@ -1,0 +1,50 @@
+{
+      "apiVersion": "2014-12-01-preview",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "bosh",
+      "location": "[parameters('location')]",
+      "properties": {
+          "securityRules": [
+      {
+        "name":"bosh_tcp_22",
+        "properties": {
+          "protocol": "tcp",
+          "sourcePortRange": "*",
+          "destinationPortRange": "22",
+          "sourceAddressPrefix": "*",
+          "destinationAddressPrefix": "*",
+          "access": "Allow",
+          "priority": 3002,
+          "direction": "Inbound"
+        }
+      },
+      {
+        "name":"bosh_tcp_2555",
+        "properties": {
+          "protocol": "tcp",
+          "sourcePortRange": "*",
+          "destinationPortRange": "2555",
+          "sourceAddressPrefix": "*",
+          "destinationAddressPrefix": "*",
+          "access": "Allow",
+          "priority": 3001,
+          "direction": "Inbound"
+        }
+      },
+      {
+        "name":"bosh_tcp_6868",
+        "properties": {
+          "protocol": "tcp",
+          "sourcePortRange": "*",
+          "destinationPortRange": "6868",
+          "sourceAddressPrefix": "*",
+          "destinationAddressPrefix": "*",
+          "access": "Allow",
+          "priority": 3000,
+          "direction": "Inbound"
+        }
+      }
+    ]
+  
+    }
+    }
