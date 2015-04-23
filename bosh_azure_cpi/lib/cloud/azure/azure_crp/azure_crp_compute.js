@@ -501,13 +501,19 @@ var getCurrentSubscription = function(subscriptionId, finishedCallback) {
     var profilePath = path.join(HOMEDIR, ".azure/azureProfile.json")
     if (fs.existsSync(profilePath)) {
         var sb = fs.readFileSync(profilePath);
-        sb = JSON.parse(String(sb));
-        if(sb.subscriptions){
-           subscriptionId.id= sb.subscriptions.filter(function(t) {
-            return t.isDefault == true;
-          })[0].id;
-         finishedCallback(null, subscriptionId.id);
-         return 
+        sb = JSON.parse(String(sb)).subscriptions;
+        var sb_defaul = null;
+        if(sb){
+           sb_default = sb.filter(function(t) {
+                   return t.isDefault == true;
+             });
+           if(sb_default.length>0){
+              subscriptionId.id = sb_default[0].id
+           }else{
+              subscriptionId.id = sb[0].id
+           }
+           finishedCallback(null, subscriptionId.id);
+           return;
        }
     }
     azureCommand(["account", "list", "--json"], function(err, msg) {
