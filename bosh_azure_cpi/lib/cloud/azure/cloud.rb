@@ -95,14 +95,12 @@ module Bosh::AzureCloud
       with_thread_name("create_vm(#{agent_id}, ...)") do
         begin
           raise "Given stemcell '#{stemcell_id}' does not exist" unless @azure.stemcell_manager.has_stemcell?(stemcell_id)
-      #    agent_id = 'bm-4c1ebe45-f384-4ae2-a9bd-273cacb5687c'
-          instance = @azure.vm_manager.create(
+          instance_id = @azure.vm_manager.create(
             agent_id,
             stemcell_id,
             azure_properties,
             NetworkConfigurator.new(networks),
             resource_pool)
-           instance_id = instance
 
           logger.info("Created new instance '#{instance_id}'")
           unless disk_locality.nil?
@@ -122,7 +120,7 @@ module Bosh::AzureCloud
 
           instance_id
         rescue => e
-          @azure.vm_manager.delete(instance_id) if instance
+          @azure.vm_manager.delete(instance_id) if instance_id
           cloud_error("Failed to create instance: #{e.message}\n#{e.backtrace.join("\n")}")
         end
       end
@@ -328,7 +326,7 @@ module Bosh::AzureCloud
             "management_certificate",
             "storage_account_name",
             "storage_access_key",
-            "affinity_group_name",
+            "resource_group_name",
             "ssh_certificate",
             "ssh_private_key"],
           "registry" => ["endpoint", "user", "password"],

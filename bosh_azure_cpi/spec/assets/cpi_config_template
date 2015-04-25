@@ -6,7 +6,7 @@ azure:
       storage_access_key: <your_storage_access_key>
       ssh_certificate: <content_of_your_ssh_certificate>
       ssh_private_key: <content_of_your_ssh_private_key>
-      affinity_group_name: <your_affinity_group_name>
+      resource_group_name: <your_resource_group_name>
 registry:
       endpoint: http://admin:admin@localhost:25888
       user: admin

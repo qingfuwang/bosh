@@ -2,7 +2,7 @@ var fs = require("fs"),
     common = require("azure-common"),
     resourceManagement = require("azure-mgmt-resource"),
     path = require("path");
-var argv = require('optimist').usage('node azure_vm_op.js -r resourcegroup -t task  ')
+var argv = require('optimist').usage('node azure_crp_compute.js -r resourcegroup -t task  ')
     .demand(['r', 't'])
     .describe('r', 'resource group name')
     .describe('t', 'task name')

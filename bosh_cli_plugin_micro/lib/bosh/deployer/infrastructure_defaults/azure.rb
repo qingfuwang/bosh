@@ -35,8 +35,7 @@ module Bosh::Deployer::InfrastructureDefaults
           'ssh_certificate' => nil,
           'ssh_private_key' => nil,
           'wala_lib_path' => '/var/lib/waagent',
-          'affinity_group_name' => nil,
-          'default_security_groups' => []
+          'resource_group_name' => nil
         },
         'registry' => {
           'endpoint' => 'http://admin:admin@localhost:25888',

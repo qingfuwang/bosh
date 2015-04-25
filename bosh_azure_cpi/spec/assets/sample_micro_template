@@ -12,6 +12,7 @@ network:
     virtual_network_name: <virtual_network_name>
     subnet_name: <subnet_name>
     tcp_endpoints:
+    - "22:22"
     - "53:53"
     - "4222:4222"
     - "6868:6868"
@@ -38,7 +39,7 @@ cloud:
       storage_access_key: <your_storage_access_key>
       ssh_certificate: <content_of_your_ssh_certificate>
       ssh_private_key: <content_of_your_ssh_private_key>
-      affinity_group_name: <your_affinity_group_name>
+      resource_group_name: <your_resource_group_name>
 
 apply_spec:
   agent:

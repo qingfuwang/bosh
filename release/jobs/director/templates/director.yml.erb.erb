@@ -410,11 +410,8 @@ cloud:
       <% if_p('azure.wala_lib_path') do |wala_lib_path| %>
       wala_lib_path: <%= wala_lib_path %>
       <% end %>
-      <% if_p('azure.affinity_group_name') do |affinity_group_name| %>
-      affinity_group_name: <%= affinity_group_name %>
-      <% end %>
-      <% if_p('azure.default_security_groups') do |default_security_groups| %>
-      default_security_groups: <%= default_security_groups %>
+      <% if_p('azure.resource_group_name') do |resource_group_name| %>
+      resource_group_name: <%= resource_group_name %>
       <% end %>
     registry:
       endpoint: http://<%= reg_address %>:<%= reg_port %>

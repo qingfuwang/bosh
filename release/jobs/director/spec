@@ -439,7 +439,5 @@ properties:
   azure.wala_lib_path:
     description: Default WALA installation path
     default: /var/lib/waagent
-  azure.affinity_group_name:
-    description: Affinity group name to use when spinning up new vms
-  azure.default_security_groups:
-    description: Default security groups to use when spinning up new vms
+  azure.resource_group_name:
+    description: Resource group name to use when spinning up new vms

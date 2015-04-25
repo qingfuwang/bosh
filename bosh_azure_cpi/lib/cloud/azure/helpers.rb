@@ -1,12 +1,14 @@
 module Bosh::AzureCloud
   module Helpers
 
-    def generate_instance_id(cloud_service_name, vm_name)
-      instance_id = cloud_service_name + "&" + vm_name
+    def generate_instance_id(resource_group_name, agent_id)
+      instance_id = "bosh-#{resource_group_name}-#{agent_id}"
     end
 
     def parse_instance_id(instance_id)
-      cloud_service_name, vm_name = instance_id.split("&")
+      ret = instance_id.match("^bosh-([^-.]*)-(.*)$")
+      # return resource_group_name, vm_name
+      ret[1], instance_id
     end
 
     def symbolize_keys(hash)
@@ -42,7 +44,6 @@ module Bosh::AzureCloud
       result  = {};
       Open3.popen3(*cmd) {
       |stdin, stdout, stderr, wait_thr|
-
             data = ""
             stdstr=""
             begin
@@ -77,17 +78,16 @@ module Bosh::AzureCloud
     end
 
     def invoke_azure_js_with_id(arg,logger)
-        task =arg[0]
-        id = arg[1]
-        logger.info("invoke azure js "+task+"id"+String(id))
-        begin
-           #bosh-qingfu3-bm-0458d6c4-6534-4724-81f1-d71e50df778f
-            resource_group_name = id[5..-41]
-            logger.debug("resource_group_name is" +resource_group_name)
-            return invoke_azure_js(["-t",task,"-r",resource_group_name,id].concat(arg[2..-1]),logger)
-        rescue Exception => ex
-            puts("error:"+ex.message+ex.backtrace.join("\n"))
-        end
+      task =arg[0]
+      id = arg[1]
+      logger.info("invoke azure js "+task+"id"+String(id))
+      begin
+        resource_group_name = id[5..-41]
+        logger.debug("resource_group_name is" +resource_group_name)
+        return invoke_azure_js(["-t",task,"-r",resource_group_name,id].concat(arg[2..-1]),logger)
+      rescue Exception => ex
+        cloud_error("error:"+ex.message+ex.backtrace.join("\n"))
+      end
     end
 
 
