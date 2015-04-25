@@ -7,8 +7,8 @@ module Bosh::AzureCloud
 
     def parse_instance_id(instance_id)
       ret = instance_id.match("^bosh-([^-.]*)-(.*)$")
-      # return resource_group_name, vm_name
-      ret[1], instance_id
+      # return resource_group_name
+      ret[1]
     end
 
     def symbolize_keys(hash)
