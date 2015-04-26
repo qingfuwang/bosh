@@ -85,6 +85,11 @@ var azureCommand = function(p, callback) {
                 docommandcb(RETRY, "do command retry not receive resposne " + JSON.stringify(p));
                 return;
             }
+            if(stderr.match(/connect ENETUNREACH/))
+            {
+               docommandcb(RETRY, "unknow error happens " + JSON.stringify(p));
+               return;
+            }
             if (stderr.match(/^An error has occurred/)) {
                 docommandcb(RETRY, "unknow error happens " + JSON.stringify(p));
                 return;
@@ -301,6 +306,7 @@ var waitResourceupdated = function(resourcegroup, name, type, finishedCallback) 
             finishedCallback(RETRY, result);
             return;
         }
+        if(err) {finishedCallback(err, result);return};
         if (result.properties.provisioningState == "updating") {
             finishedCallback(RETRY, "wait for vm state to be succeeded");
         }
@@ -488,26 +494,38 @@ var getToken = function(subscriptionId) {
 };
 
 var refreshTokenTask = function(finishedCallback) {
-    if (getToken()[0] != null) {
-        finishedCallback(null, "done");
-        return;
-    }
-    azureCommand(["group", "list"], function(err, msg) {
+    try
+    {
+      if (getToken()[0] != null) {
+          finishedCallback(null, "done");
+         return;
+      }
+      azureCommand(["group", "list"], function(err, msg) {
         finishedCallback(err, "");
-    });
+      });
+   }catch(ex){
+     ex.code="RefreshToken Fail "+ex.code
+     finishedCallback(ex,"RefreshToken Fail")
+   }
 };
 
 var getCurrentSubscription = function(subscriptionId, finishedCallback) {
     var profilePath = path.join(HOMEDIR, ".azure/azureProfile.json")
     if (fs.existsSync(profilePath)) {
         var sb = fs.readFileSync(profilePath);
-        sb = JSON.parse(String(sb));
-        if(sb.subscriptions){
-           subscriptionId.id= sb.subscriptions.filter(function(t) {
-            return t.isDefault == true;
-          })[0].id;
-         finishedCallback(null, subscriptionId.id);
-         return 
+        sb = JSON.parse(String(sb)).subscriptions;
+        var sb_defaul = null;
+        if(sb){
+           sb_default = sb.filter(function(t) {
+                   return t.isDefault == true;
+             });
+           if(sb_default.length>0){
+              subscriptionId.id = sb_default[0].id
+           }else{
+              subscriptionId.id = sb[0].id
+           }
+           finishedCallback(null, subscriptionId.id);
+           return;
        }
     }
     azureCommand(["account", "list", "--json"], function(err, msg) {
@@ -573,6 +591,9 @@ var doAzureResourceManage = function(subscriptionId, resourcegroup, name, op, me
         }));
     
       resourceManagementClient.pipeline(httpRequest, function(err, response, body) {
+         if(err){
+           _log(err+response)
+         }
           bk(err, body);
       });
     }
