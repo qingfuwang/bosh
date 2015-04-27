@@ -34,7 +34,21 @@ module Bosh::AzureCloud
       content
     end
 
-   
+    def azure_cmd(cmd,logger)
+      logger.debug("execute command "+cmd)
+      exit_status=0
+      Open3.popen3(cmd) do |stdin, stdout, stderr, wait_thr|
+        exit_status= wait_thr.value
+        logger.debug("stdout is:" + stdout.read)
+        logger.debug("stderr is:" + stderr.read)
+        logger.debug("exit_status is:"+String(exit_status))
+        if exit_status!=0
+          logger.error("execute command fail Please try it manually to see more details")
+        end
+      end
+      return exit_status
+    end
+
     def invoke_azure_js(args,logger,abort_on_error=true)
       node_js_file = File.join(File.dirname(__FILE__),"azure_crp","azure_crp_compute.js")
       cmd = "node #{node_js_file}".split(" ")
