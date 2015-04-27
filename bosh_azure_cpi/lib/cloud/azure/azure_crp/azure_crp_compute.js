@@ -275,7 +275,7 @@ var findResource = function(resourcegroup, type, propertyId, value, REFresource,
                                         else break;
                                     }
                                     if (o == value) {
-                                        REFresource.push(JSON.parse(msg))
+                                        REFresource.push(msg)
                                     }
                                 }
                                 callback(err, msg);

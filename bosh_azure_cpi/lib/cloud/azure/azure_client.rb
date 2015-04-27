@@ -21,7 +21,17 @@ module Bosh::AzureCloud
       end
 
       container_name = azure_properties['container_name'] || 'bosh'
-            
+
+      if azure_properties['tenant_id']
+        azure_cmd("azure login -u #{azure_properties['client_id']} -p '#{azure_properties['client_secret']}' --tenant #{azure_properties['tenant_id']} --service-principal --quiet ",logger)
+      elsif azure_properties['client_id']
+        azure_cmd("azure login -u #{azure_properties['client_id']} -p '#{azure_properties['client_secret']}'",logger)
+      end
+
+      if azure_properties['subscription_id']
+        azure_cmd("azure account set  #{azure_properties['subscription_id']}",logger)
+      end
+
 
       @storage_manager        = Bosh::AzureCloud::StorageAccountManager.new(azure_properties['storage_account_name'])
       @blob_manager           = Bosh::AzureCloud::BlobManager.new
