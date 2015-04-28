@@ -386,10 +386,11 @@ cloud:
         'registry.http.port', 'registry.http.user',
         'registry.http.password') do |environment, api_version,
                                           subscription_id, storage_account_name,
-                                          storage_access_key, tenant_id,
-                                          client_id, client_secret,
-                                          reg_address, reg_port,
-                                          reg_user, reg_password| %>
+                                          storage_access_key, resource_group_name,
+                                          tenant_id, client_id,
+                                          client_secret, reg_address,
+                                          reg_port, reg_user,
+                                          reg_password| %>
   plugin: azure <% plugin = "azure" %>
   properties:
     azure:
