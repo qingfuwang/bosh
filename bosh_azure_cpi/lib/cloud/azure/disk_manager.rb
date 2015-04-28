@@ -1,16 +1,13 @@
 module Bosh::AzureCloud
   class DiskManager
-    DISK_FAMILY = 'bosh'
-
     attr_reader   :container_name
     attr_accessor :logger
     
     include Bosh::Exec
     include Helpers
 
-    def initialize(container_name, storage_manager, blob_manager)
+    def initialize(container_name, blob_manager)
       @container_name = container_name
-      @storage_manager = storage_manager
       @blob_manager = blob_manager
 
       @logger = Bosh::Clouds::Config.logger
@@ -24,7 +21,7 @@ module Bosh::AzureCloud
 
     def snapshot_disk(disk_id, metadata)
       snapshot_disk_name = "bosh-disk-#{SecureRandom.uuid}"
-      disk_blob_name = disk_id+".vhd"
+      disk_blob_name = "#{disk_id}.vhd"
       @blob_manager.snapshot_blob(blob_container_name, disk_blob_name, metadata, "#{snapshot_disk_name}.vhd")
       snapshot_disk_name
     end
@@ -38,40 +35,39 @@ module Bosh::AzureCloud
       disk_name = "bosh-disk-#{SecureRandom.uuid}"
       logger.info("Start to create an empty vhd blob: blob_name: #{disk_name}.vhd")
       @blob_manager.create_empty_vhd_blob(container_name, "#{disk_name}.vhd", size)
-      return "#{disk_name}"
+      disk_name
     end
 
     def has_disk?(disk_id)
+      ret = true
       begin
-        @blob_manager.get_blob_properties(container_name,"#{disk_id}.vhd")
+        @blob_manager.get_blob_properties(container_name, "#{disk_id}.vhd")
       rescue
-        return false
+        ret = false
       end
-      return true
+      ret
     end
 
     def get_disk_uri(disk_name)
-      return @blob_manager.get_blob_uri(@container_name,disk_name+".vhd")
+      @blob_manager.get_blob_uri(@container_name, "#{disk_name}.vhd")
     end
 
-   def get_new_osdisk_uri(vm_id)
-      destination_blob = vm_id+String(Time.now.to_i)+"_os_disk.vhd"
-      return  @blob_manager.get_blob_uri(@container_name,destination_blob)
-   end
+    def get_new_osdisk_uri(vm_id)
+      destination_blob = vm_id + Time.now.to_i.to_s + "_os_disk.vhd"
+      @blob_manager.get_blob_uri(@container_name, destination_blob)
+    end
 
-   def get_stemcell_uri(stemcell)
-      return @blob_manager.get_blob_uri("stemcell",stemcell)
-   end
-
-   def disks
-      disks= @blob_manager.list_blobs(@container_name).select{ |d| return d.name=~/vhd$/
-          }.map {|d| return {
-                        :name     => d.name,
-                        :attached => d.properties[:lease_status]=='unlocked'?false:true
-                     }
-                }
-     return disks 
-   end
+    def disks
+      disks = @blob_manager.list_blobs(@container_name).select{
+        |d| return d.name = ~/vhd$/
+      }.map { |d|
+        return {
+            :name     => d.name,
+            :attached => d.properties[:lease_status] == 'unlocked' ? false : true
+         }
+      }
+      disks
+    end
 
   end
 end

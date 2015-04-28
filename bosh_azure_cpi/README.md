@@ -6,18 +6,24 @@ These options are passed to the Azure CPI when it is instantiated.
 
 ### Azure options
 
-* `management_endpoint` (required)
-  The base URI for Azure Management Service
+* `environment` (required)
+  The environment for Azure Management Service: AzureCloud or AzureChinaCloud
+* `api_version` (required)
+  The API version of Azure Management Service
 * `subscription_id` (required)
   Azure Subscription Id
-* `management_certificate` (required)
-  Base64 encoding content of Azure API certificates used to authenticate service management operations
 * `storage_account_name` (required)
   Azure storage account name
 * `storage_access_key` (required)
   Azure storage access key
 * `resource_group_name` (required)
   Resource group name to use when spinning up new vms
+* `tenant_id` (required)
+  The tenant id for your service principal
+* `client_id` (required)
+  The client id for your service principal
+* `client_secret` (required)
+  The client secret for your service principal
 * `ssh_certificate` (required)
   Base64 encoding content of the default certificate to use when spinning up new vms
 * `ssh_private_key` (required)
@@ -80,16 +86,15 @@ This is a sample of how Azure specific properties are used in a BOSH deployment 
             virtual_network_name: boshvnet
             subnet_name: BOSH
             tcp_endpoints:
-            - 22:22
-            - 53:53
-            - 4222:4222
-            - 25777:25777
-            - 25250:25250
-            - 6868:6868
-            - 25555:25555
+            - "22:22"
+            - "53:53"
+            - "4222:4222"
+            - "6868:6868"
+            - "25250:25250"
+            - "25555:25555"
+            - "25777:25777"
             udp_endpoints:
-            - 53:53
-            - 68:68
+            - "68:68"
 
     ...
 
@@ -107,11 +112,14 @@ This is a sample of how Azure specific properties are used in a BOSH deployment 
 
     properties:
       azure:
-        management_endpoint: https://management.core.windows.net
+        environment: AzureCloud
+        api_version: 2015-05-01-preview
         subscription_id: <your_subscription_id>
-        management_certificate: "<base64_encoding_content_of_your_management_certificate>"
         storage_account_name: <your_storage_account_name>
         storage_access_key: <your_storage_access_key>
-        ssh_certificate: "<base64_encoding_content_of_your_ssh_certificate>"
-        ssh_private_key: "<base64_encoding_content_of_your_ssh_private_key>"
         resource_group_name: <your_resource_group_name>
+        tenant_id: <your_tenant_id>
+        client_id: <your_client_id>
+        client_secret: <your_client_secret>
+        ssh_certificate: <content_of_your_ssh_certificate>
+        ssh_private_key: <content_of_your_ssh_private_key>

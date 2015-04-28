@@ -1,6 +1,5 @@
 module Bosh::AzureCloud
   class StemcellManager
-    IMAGE_FAMILY = 'bosh'
     STEM_CELL_CONTAINER = 'stemcell'    
 
     attr_reader   :container_name
@@ -9,9 +8,8 @@ module Bosh::AzureCloud
     include Bosh::Exec
     include Helpers
 
-    def initialize(storage_manager, blob_manager)
+    def initialize(blob_manager)
       @container_name = STEM_CELL_CONTAINER
-      @storage_manager = storage_manager
       @blob_manager = blob_manager
 
       @logger = Bosh::Clouds::Config.logger
@@ -38,12 +36,12 @@ module Bosh::AzureCloud
       true
     end
 
-    def delete_image(image_name)
-      http_delete("services/images/#{image_name}?comp=media")
+    def delete_image(name)
+      @blob_manager.delete_blob(container_name, "#{name}.vhd")
     end
 
     def stemcells
-      return @blob_manager.list_blobs(@container_name)
+      return @blob_manager.list_blobs(container_name)
     end
 
     def create_stemcell(image_path, cloud_properties)
@@ -52,6 +50,10 @@ module Bosh::AzureCloud
       stemcell_name = "bosh-image-#{SecureRandom.uuid}"
       @blob_manager.create_page_blob(container_name, vhd_path, "#{stemcell_name}.vhd")
       stemcell_name
+    end
+
+    def get_stemcell_uri(name)
+      @blob_manager.get_blob_uri(STEM_CELL_CONTAINER, "#{name}.vhd")
     end
 
     private

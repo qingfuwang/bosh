@@ -95,23 +95,19 @@ module Bosh::AzureCloud
       with_thread_name("create_vm(#{agent_id}, ...)") do
         begin
           raise "Given stemcell '#{stemcell_id}' does not exist" unless @azure.stemcell_manager.has_stemcell?(stemcell_id)
+          stemcell_uri = @azure.stemcell_manager.get_stemcell_uri(stemcell_id)
           instance_id = @azure.vm_manager.create(
             agent_id,
-            stemcell_id,
+            stemcell_uri,
             azure_properties,
             NetworkConfigurator.new(networks),
             resource_pool)
 
           logger.info("Created new instance '#{instance_id}'")
-          unless disk_locality.nil?
-            logger.info("Attach disks to the new instance")
-            disk_locality.each do |disk_id|
-              attach_disk(instance_id, disk_id)
-            end
-          end
 
           registry_settings = initial_agent_settings(
             agent_id,
+            instance_id,
             networks,
             env,
             "/dev/sda"
@@ -183,6 +179,7 @@ module Bosh::AzureCloud
     # @return [void]
     def set_vm_metadata(instance_id, metadata)
       logger.info("set_vm_metadata(#{instance_id}, #{metadata})")
+      @azure.vm_manager.set_metadata(instance_id, metadata)
     end
 
     ##
@@ -321,14 +318,17 @@ module Bosh::AzureCloud
     #
     def validate_options
       required_keys = {
-          "azure" => ["management_endpoint",
+          "azure" => ["environment",
+            "api_version",
             "subscription_id",
-            "management_certificate",
             "storage_account_name",
             "storage_access_key",
             "resource_group_name",
             "ssh_certificate",
-            "ssh_private_key"],
+            "ssh_private_key",
+            "tenant_id",
+            "client_id",
+            "client_secret"],
           "registry" => ["endpoint", "user", "password"],
       }
 
@@ -352,17 +352,13 @@ module Bosh::AzureCloud
       registry_password   = registry_properties.fetch('password')
 
       # Registry updates are not really atomic in relation to
-      # Azure API calls, so they might get out of sync. Cloudcheck
-      # is supposed to fix that.
+      # Azure API calls, so they might get out of sync.
       @registry = Bosh::Registry::Client.new(registry_endpoint,
                                              registry_user,
                                              registry_password)
     end
 
     def init_azure
-      @azure_certificate_file = "/tmp/azure.pem"
-      File.open(@azure_certificate_file, 'w+') { |f| f.write(azure_properties['management_certificate']) }
-
       @ssh_certificate_file = "/tmp/bosh_cert.pem"
       File.open(@ssh_certificate_file, 'w+') { |f| f.write(azure_properties['ssh_certificate']) }
 
@@ -371,7 +367,6 @@ module Bosh::AzureCloud
 
       @azure_properties = azure_properties.merge(
                             {
-                              'azure_certificate_file' => @azure_certificate_file,
                               'ssh_certificate_file'   => @ssh_certificate_file,
                               'ssh_private_key_file'   => @ssh_private_key_file
                             })
@@ -386,14 +381,15 @@ module Bosh::AzureCloud
     #
     # @param [String] agent_id Agent id (will be picked up by agent to
     #   assume its identity
+    # @param [String] vm_name VM name
     # @param [Hash] network_spec Agent network spec
     # @param [Hash] environment
     # @param [String] root_device_name root device, e.g. /dev/sda1
     # @return [Hash]
-    def initial_agent_settings(agent_id, network_spec, environment, root_device_name)
+    def initial_agent_settings(agent_id, vm_name, network_spec, environment, root_device_name)
       settings = {
           "vm" => {
-              "name" => "bosh-vm-#{agent_id}"
+              "name" => vm_name
           },
           "agent_id" => agent_id,
           "networks" => network_spec,

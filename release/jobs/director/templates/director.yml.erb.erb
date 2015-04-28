@@ -378,23 +378,30 @@ cloud:
 
 <% end %>
 
-<% if_p('azure.management_endpoint', 'azure.subscription_id',
-        'azure.management_certificate', 'azure.storage_account_name',
-        'azure.storage_access_key', 'registry.address',
+<% if_p('azure.environment', 'azure.api_version',
+        'azure.subscription_id', 'azure.storage_account_name',
+        'azure.storage_access_key', 'azure.resource_group_name',
+        'azure.tenant_id', 'azure.client_id',
+        'azure.client_secret', 'registry.address',
         'registry.http.port', 'registry.http.user',
-        'registry.http.password') do |management_endpoint, subscription_id,
-                                          management_certificate, storage_account_name,
-                                          storage_access_key, reg_address,
-                                          reg_port, reg_user,
-                                          reg_password| %>
+        'registry.http.password') do |environment, api_version,
+                                          subscription_id, storage_account_name,
+                                          storage_access_key, tenant_id,
+                                          client_id, client_secret,
+                                          reg_address, reg_port,
+                                          reg_user, reg_password| %>
   plugin: azure <% plugin = "azure" %>
   properties:
     azure:
-      management_endpoint: <%= management_endpoint %>
+      environment: <%= environment %>
+      api_version: <%= api_version %>
       subscription_id: <%= subscription_id %>
-      management_certificate: <%= JSON.dump(management_certificate) %>
       storage_account_name: <%= storage_account_name %>
       storage_access_key: <%= storage_access_key %>
+      resource_group_name: <%= resource_group_name %>
+      tenant_id: <%= tenant_id %>
+      client_id: <%= client_id %>
+      client_secret: <%= client_secret %>
       <% if_p('azure.container_name') do |container_name| %>
       container_name: <%= container_name %>
       <% end %>
@@ -409,9 +416,6 @@ cloud:
       <% end %>
       <% if_p('azure.wala_lib_path') do |wala_lib_path| %>
       wala_lib_path: <%= wala_lib_path %>
-      <% end %>
-      <% if_p('azure.resource_group_name') do |resource_group_name| %>
-      resource_group_name: <%= resource_group_name %>
       <% end %>
     registry:
       endpoint: http://<%= reg_address %>:<%= reg_port %>

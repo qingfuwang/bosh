@@ -82,9 +82,16 @@ properties:
     description: Hash containing optional connection parameters to the OpenStack API
 
   # For Azure
-  azure.management_endpoint:
-    description: The base URI for Azure Management Service
+  azure.environment:
+    description: The environment for Azure Management Service, AzureCloud or AzureChinaCloud
+    default: AzureCloud
+  azure.api_version:
+    description: The API version of Azure Management Service
   azure.subscription_id:
     description: Azure Subscription Id
-  azure.management_certificate:
-    description: The content of Azure API certificates used to authenticate service management operations
+  azure.tenant_id:
+    description: The tenant id for your service principal
+  azure.client_id:
+    description: The client id for your service principal
+  azure.client_secret:
+    description: The client secret for your service principal

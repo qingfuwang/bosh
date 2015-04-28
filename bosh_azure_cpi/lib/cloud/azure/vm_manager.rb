@@ -3,29 +3,37 @@ module Bosh::AzureCloud
     attr_accessor :logger
     include Helpers
 
-    def initialize(storage_manager, registry, disk_manager)
-      @storage_manager = storage_manager
+    def initialize(storage_account_name, registry, disk_manager)
+      @storage_account_name = storage_account_name
       @registry = registry
       @disk_manager = disk_manager
       @logger = Bosh::Clouds::Config.logger
     end
 
-    def create(uuid, stemcell, cloud_opts, network_configurator, resource_pool)
-      instanceid = generate_instance_id(cloud_opts["resource_group_name"], uuid)
-      imageUri = @disk_manager.get_stemcell_uri(stemcell+".vhd")
-      osvhdUri = @disk_manager.get_new_osdisk_uri(instanceid)
+    def create(uuid, stemcell_uri, cloud_opts, network_configurator, resource_pool)
+      instance_id = generate_instance_id(cloud_opts["resource_group_name"], uuid)
+
+      osvhdUri = @disk_manager.get_new_osdisk_uri(instance_id)
       sshKeyData = File.read(cloud_opts['ssh_certificate_file'])
-      location = invoke_azure_js("-t getlocation -r #{cloud_opts['resource_group_name']}".split(" "),logger)
+      location_opts = [
+              "-t",
+              "get",
+              "-r",
+              cloud_opts['resource_group_name'],
+              @storage_account_name,
+              "Microsoft.Storage/storageAccounts"
+            ]
+      location = JSON(invoke_azure_js(location_opts, logger))["location"]
       params = {
-        :vmName              => instanceid,
-        :nicName             => instanceid,
+        :vmName              => instance_id,
+        :nicName             => instance_id,
         :adminUserName       => cloud_opts['ssh_user'],
-        :imageUri            => imageUri,
+        :imageUri            => stemcell_uri,
         :osvhdUri            => osvhdUri,
         :location            => location,
         :vmSize              => resource_pool['instance_type'],
-        :storageAccountName  => @storage_manager.get_storage_account_name,
-        :customData          => get_user_data(instanceid, network_configurator.dns),
+        :storageAccountName  => @storage_account_name,
+        :customData          => get_user_data(instance_id, network_configurator.dns),
         :sshKeyData          => sshKeyData
       }
       params[:virtualNetworkName] = network_configurator.virtual_network_name
@@ -49,20 +57,21 @@ module Bosh::AzureCloud
         #add nic to 'bosh' network security group,ignore error
         if ipname==nil || ipname.length==0
           logger.debug(network_configurator.reserved_ip+" is not a reserved ip , go to create ip and take it as fqdn name")
-          ipname = instanceid
+          ipname = instance_id
           invoke_azure_js("-r #{cloud_opts['resource_group_name']} -t createip #{ipname}  #{network_configurator.reserved_ip.split(".")[0].split("/")[-1]}".split(" "),logger)
           ip_crp_template = "azure_vm_ip.json"
           invoke_azure_js("-r #{cloud_opts['resource_group_name']} -t addsecuritygroup #{ipname} #{default_security_groupname}".split(" "),logger)
         end
 
         #bind the ip or endpoint to nic of that vm
-        p = {"StorageAccountName"      => @storage_manager.get_storage_account_name,
-          "lbName"                  => network_property['load_balance_name']?network_property['load_balance_name']:instanceid,
-          "publicIPAddressName"     =>ipname,
-          "nicName"                 =>instanceid,
-          "virtualNetworkName"      =>"vnet",
+        p = {
+          "StorageAccountName"      => @storage_account_name,
+          "lbName"                  => network_property['load_balance_name'] ? network_property['load_balance_name'] : instance_id,
+          "publicIPAddressName"     => ipname,
+          "nicName"                 => instance_id,
+          "virtualNetworkName"      => "vnet",
           "TcpEndPoints"            => network_configurator.tcp_endpoints,
-          "UdpEndPoints"            =>network_configurator.udp_endpoints
+          "UdpEndPoints"            => network_configurator.udp_endpoints
         }
 
         p = p.merge(params)
@@ -70,20 +79,22 @@ module Bosh::AzureCloud
         args.push(File.join(File.dirname(__FILE__),"azure_crp",ip_crp_template))
         args.push(Base64.encode64(p.to_json()))
         result = invoke_azure_js(args,logger)
-        #set_tag(instanceid,{"vip" => network_configurator.reserved_ip})
       end
       if not result
-        delete(instanceid)
+        delete(instance_id)
         cloud_error("create vm failed")
       end 
-      return instanceid if result
+      instance_id if result
+    rescue => e
+      delete(instance_id)
+      cloud_error("create vm failed: #{e.message}\n#{e.backtrace.join("\n")}")
     end
 
     def find(instance_id)
       vm= JSON(invoke_azure_js_with_id(["get",instance_id,"Microsoft.Compute/virtualMachines"],logger))
       publicip = invoke_azure_js_with_id(["get",instance_id,"Microsoft.Network/publicIPAddresses"],logger)
       publicip = JSON(publicip) if publicip
-      dipaddress = (publicip!=nil)?publicip["properties"]["ipAddress"]:nil;
+      dipaddress = (publicip!=nil) ? publicip["properties"]["ipAddress"] : nil
 
       nic = JSON(invoke_azure_js_with_id(["get",instance_id,"Microsoft.Network/networkInterfaces"],logger))["properties"]["ipConfigurations"][0]
       return {
@@ -104,22 +115,23 @@ module Bosh::AzureCloud
     end
 
     def reboot(instance_id)
-       invoke_azure_js_with_id(["reboot",instance_id],logger)
+       invoke_azure_js_with_id(["reboot", instance_id], logger)
     end
 
     def start(instance_id)
-       invoke_azure_js_with_id(["start",instance_id],logger)
+       invoke_azure_js_with_id(["start", instance_id], logger)
     end
 
     def shutdown(instance_id)
-      invoke_azure_js_with_id(["stop",instance_id],logger)
+      invoke_azure_js_with_id(["stop", instance_id], logger)
     end
-    def set_tag(instance_id,tag)
-      tagStr = ""
-      tag.each { |i| tagStr << "#{i[0]}=#{i[1]};" }
-      tagStr = tagStr[0..-2]
-      invoke_azure_js_with_id(["setTag",instance_id,"Microsoft.Compute/virtualMachines",tagStr],logger)
+
+    def set_metadata(instance_id, metadata)
+      tag = ""
+      metadata.each_pair { |key, value| tag << "#{key}=#{value};" }
+      invoke_azure_js_with_id(["setTag", instance_id, "Microsoft.Compute/virtualMachines", tag[0..-2]], logger)
     end
+
     def instance_id(wala_lib_path)
       logger.debug("instance_id(#{wala_lib_path})")
       contents = File.open(wala_lib_path + "/CustomData", "r"){ |file| file.read }

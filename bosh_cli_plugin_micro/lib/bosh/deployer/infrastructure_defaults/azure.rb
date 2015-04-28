@@ -17,7 +17,7 @@ module Bosh::Deployer::InfrastructureDefaults
     'resources' => {
       'persistent_disk' => 4096,
       'cloud_properties' => {
-        'instance_type' => 'Small',
+        'instance_type' => 'Standard_A1',
         'availability_zone' => nil
       }
     },
@@ -25,17 +25,20 @@ module Bosh::Deployer::InfrastructureDefaults
       'plugin' => 'azure',
       'properties' => {
         'azure' => {
-          'management_endpoint' => 'https://management.core.windows.net',
+          'environment' => 'AzureCloud',
+          'api_version' => '2015-05-01-preview',
           'subscription_id' => nil,
-          'management_certificate' => nil,
           'storage_account_name' => nil,
           'storage_access_key' => nil,
+          'resource_group_name' => nil,
+          'tenant_id' => nil,
+          'client_id' => nil,
+          'client_secret' => nil,
           'container_name' => 'bosh',
           'ssh_user' => 'vcap',
           'ssh_certificate' => nil,
           'ssh_private_key' => nil,
-          'wala_lib_path' => '/var/lib/waagent',
-          'resource_group_name' => nil
+          'wala_lib_path' => '/var/lib/waagent'
         },
         'registry' => {
           'endpoint' => 'http://admin:admin@localhost:25888',
@@ -44,7 +47,7 @@ module Bosh::Deployer::InfrastructureDefaults
         },
         'stemcell' => {
           'kernel_id' => nil,
-          'disk' => 4096
+          'disk' => 8192
         },
         'agent' => {
           'ntp' => [],

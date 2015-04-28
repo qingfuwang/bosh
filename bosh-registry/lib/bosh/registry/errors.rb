@@ -15,6 +15,8 @@ module Bosh::Registry
 
   class AWSError < Error; end
 
+  class AzureError < Error; end
+
   class InstanceError < Error; end
   class InstanceNotFound < Error; code(404); end
 end

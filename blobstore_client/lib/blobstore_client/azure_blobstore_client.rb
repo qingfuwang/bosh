@@ -4,10 +4,40 @@ module Bosh
   module Blobstore
     class AzureBlobstoreClient < BaseClient
 
+      AZURE_ENVIRONMENTS = {
+        'AzureCloud' => {
+          'portalUrl' => 'http://go.microsoft.com/fwlink/?LinkId=254433',
+          'publishingProfileUrl' => 'http://go.microsoft.com/fwlink/?LinkId=254432',
+          'managementEndpointUrl' => 'https://management.core.windows.net',
+          'resourceManagerEndpointUrl' => 'https://management.azure.com/',
+          'sqlManagementEndpointUrl' => 'https://management.core.windows.net:8443/',
+          'sqlServerHostnameSuffix' => '.database.windows.net',
+          'galleryEndpointUrl' => 'https://gallery.azure.com/',
+          'activeDirectoryEndpointUrl' => 'https://login.windows.net',
+          'activeDirectoryResourceId' => 'https://management.core.windows.net/',
+          'commonTenantName' => 'common',
+          'activeDirectoryGraphResourceId' => 'https://graph.windows.net/',
+          'activeDirectoryGraphApiVersion' => '2013-04-05'
+        },
+        'AzureChinaCloud' => {
+          'portalUrl' => 'http://go.microsoft.com/fwlink/?LinkId=301902',
+          'publishingProfileUrl' => 'http://go.microsoft.com/fwlink/?LinkID=301774',
+          'managementEndpointUrl' => 'https://management.core.chinacloudapi.cn',
+          'sqlManagementEndpointUrl' => 'https://management.core.chinacloudapi.cn:8443/',
+          'sqlServerHostnameSuffix' => '.database.chinacloudapi.cn',
+          'activeDirectoryEndpointUrl' => 'https://login.chinacloudapi.cn',
+          'activeDirectoryResourceId' => 'https://management.core.chinacloudapi.cn/',
+          'commonTenantName' => 'common',
+          'activeDirectoryGraphResourceId' => 'https://graph.windows.net/',
+          'activeDirectoryGraphApiVersion' => '2013-04-05'
+        }
+      }
+
       attr_reader :container_name
 
       # Blobstore client for Azure blob storage
       # @param [Hash] options Azure BlobStore options
+      # @option options [Symbol] environment
       # @option options [Symbol] container_name
       # @option options [Symbol] storage_account_name
       # @option options [Symbol] storage_access_key
@@ -16,8 +46,9 @@ module Bosh
         @container_name = @options[:container_name]
 
         Azure.configure do |config|
+          config.storage_blob_host    = AZURE_ENVIRONMENTS[@options[:environment]]['managementEndpointUrl'].sub("//management.","//#{@options[:storage_account_name]}.blob.")
           config.storage_account_name = @options[:storage_account_name]
-          config.storage_access_key = @options[:storage_access_key]
+          config.storage_access_key   = @options[:storage_access_key]
         end
 
         @azure_blob_service = Azure::BlobService.new
