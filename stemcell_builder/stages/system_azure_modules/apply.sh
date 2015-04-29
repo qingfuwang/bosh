@@ -18,7 +18,7 @@ cli_version=0.8.16
 run_in_chroot $chroot "
 npm install -g azure-cli@${cli_version} -g
 npm install optimist -g
-npm install azure-mgmt-resource -g
+npm install azure-mgmt-resource -g
 npm install retry -g
 npm install async -g
 npm install azure-common -g
