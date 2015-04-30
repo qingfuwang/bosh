@@ -123,32 +123,32 @@ var NatRuleRef = {
     "id": ""
 }
 
-var formatParameter = function(templatefile, paramters) {
+var formatParameter = function(templatefile, parameters) {
     var templateData = JSON.parse(String(fs.readFileSync(templatefile)));
     var newParameter = {};
-    paramters["NatRules"] = [];
-    paramters["NatRulesRef"] = [];
-    Object.keys(paramters).forEach(function(key) {
+    parameters["NatRules"] = [];
+    parameters["NatRulesRef"] = [];
+    Object.keys(parameters).forEach(function(key) {
 
         if (key == "TcpEndPoints" || key == "UdpEndPoints") {
             var isTcp = key == "TcpEndPoints";
-            var lbName = paramters["lbName"];
-            var nicName = paramters["nicName"];
-            paramters[key].split(",").forEach(function(p) {
+            var lbName = parameters["lbName"];
+            var nicName = parameters["nicName"];
+            parameters[key].split(",").forEach(function(p) {
                 p = p.trim()
                 frontport = p.split(":")[0];
                 endport = p.split(":")[1];
                 NatRule.properties.frontendIPConfiguration = {
-                    "id": "/subscriptions/" + paramters.sid + "/resourceGroups/" + paramters.rgname + "/providers/Microsoft.Network/loadBalancers/" + lbName + "/frontendIPConfigurations/LBFE"
+                    "id": "/subscriptions/" + parameters.sid + "/resourceGroups/" + parameters.rgname + "/providers/Microsoft.Network/loadBalancers/" + lbName + "/frontendIPConfigurations/LBFE"
                 };
-                NatRule.properties.backendIPConfiguration.id = "/subscriptions/" + paramters.sid + "/resourceGroups/" + paramters.rgname + "/providers/Microsoft.Network/networkInterfaces/" + nicName + "/ipConfigurations/ipconfig1";
+                NatRule.properties.backendIPConfiguration.id = "/subscriptions/" + parameters.sid + "/resourceGroups/" + parameters.rgname + "/providers/Microsoft.Network/networkInterfaces/" + nicName + "/ipConfigurations/ipconfig1";
                 NatRule.properties.protocol = isTcp ? "Tcp" : "Udp";
                 NatRule.name = "NatRule-" + key + "-" + frontport;
                 NatRule.properties.frontendPort = frontport;
                 NatRule.properties.backendPort = endport;
-                paramters["NatRules"].push(JSON.parse(JSON.stringify(NatRule)));
-                NatRuleRef.id = "/subscriptions/" + paramters.sid + "/resourceGroups/" + paramters.rgname + "/providers/Microsoft.Network/loadBalancers/" + lbName + "/inboundNatRules/" + NatRule.name
-                paramters["NatRulesRef"].push(JSON.parse(JSON.stringify(NatRuleRef)));
+                parameters["NatRules"].push(JSON.parse(JSON.stringify(NatRule)));
+                NatRuleRef.id = "/subscriptions/" + parameters.sid + "/resourceGroups/" + parameters.rgname + "/providers/Microsoft.Network/loadBalancers/" + lbName + "/inboundNatRules/" + NatRule.name
+                parameters["NatRulesRef"].push(JSON.parse(JSON.stringify(NatRuleRef)));
             });
         }
 
@@ -156,20 +156,20 @@ var formatParameter = function(templatefile, paramters) {
 
     Object.keys(templateData.parameters).forEach(function(key) {
 
-        if (paramters[key]) {
+        if (parameters[key]) {
             newParameter[key] = {
-                'value': paramters[key]
+                'value': parameters[key]
             };
         }
     });
     return JSON.stringify(newParameter);
 };
 
-var doDeploy = function(resourcegroup, templatefile, paramters, deployname, sid, finishedCallback) {
-    paramters.sid = sid;
-    paramters.rgname = resourcegroup;
+var doDeploy = function(resourcegroup, templatefile, parameters, deployname, sid, finishedCallback) {
+    parameters.sid = sid;
+    parameters.rgname = resourcegroup;
 
-    azureCommand(["group", "deployment", "create", "-s", paramters.StorageAccountName, "-g", resourcegroup, "-n", deployname.id, "-f", templatefile, "-p", formatParameter(templatefile, paramters)], finishedCallback);
+    azureCommand(["group", "deployment", "create", "-g", resourcegroup, "-n", deployname.id, "-f", templatefile, "-p", formatParameter(templatefile, parameters)], finishedCallback);
 };
 
 
@@ -612,7 +612,7 @@ var main = function() {
             refreshTokenTask(callback);
         }
     );
-    _log("paramters " + argv._);
+    _log("parameters " + argv._);
     switch (task) {
         case "deploy":
             var template = argv._[0];
@@ -627,20 +627,20 @@ var main = function() {
             var deployname = {};
 
             tasks.push(function(callback) {
-                var paramters = argv._[1];
-                if (fs.existsSync(paramters)) {
-                    paramters = fs.readFileSync(paramters);
+                var parameters = argv._[1];
+                if (fs.existsSync(parameters)) {
+                    parameters = fs.readFileSync(parameters);
                 }
                 else {
-                    paramters = new Buffer(paramters, 'base64').toString('utf-8');
+                    parameters = new Buffer(parameters, 'base64').toString('utf-8');
                 }
-                paramters = JSON.parse(paramters);
+                parameters = JSON.parse(parameters);
                 if (!fs.existsSync(template)) {
                     callback(ABORT, "no such file or directory  " + template);
                     return;
                 }
                 waitDeploymentSuccess(function(cb) {
-                    doDeploy(resourcegroup, template, paramters, deployname, subscriptionId.id, cb);
+                    doDeploy(resourcegroup, template, parameters, deployname, subscriptionId.id, cb);
                 }, subscriptionId.id, resourcegroup, deployname, callback);
             });
             break;

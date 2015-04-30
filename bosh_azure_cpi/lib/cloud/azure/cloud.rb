@@ -2,7 +2,6 @@ module Bosh::AzureCloud
   class Cloud < Bosh::Cloud
     attr_reader   :registry
     attr_reader   :options
-    attr_accessor :logger
     attr_reader   :azure
 
     include Helpers
@@ -103,7 +102,7 @@ module Bosh::AzureCloud
             NetworkConfigurator.new(networks),
             resource_pool)
 
-          logger.info("Created new instance '#{instance_id}'")
+          @logger.info("Created new instance '#{instance_id}'")
 
           registry_settings = initial_agent_settings(
             agent_id,
@@ -129,7 +128,7 @@ module Bosh::AzureCloud
     # @return [void]
     def delete_vm(instance_id)
       with_thread_name("delete_vm(#{instance_id})") do
-        logger.info("Deleting instance '#{instance_id}'")
+        @logger.info("Deleting instance '#{instance_id}'")
         @azure.vm_manager.delete(instance_id)
       end
     end
@@ -178,7 +177,7 @@ module Bosh::AzureCloud
     # @param [Hash] metadata metadata key/value pairs
     # @return [void]
     def set_vm_metadata(instance_id, metadata)
-      logger.info("set_vm_metadata(#{instance_id}, #{metadata})")
+      @logger.info("set_vm_metadata(#{instance_id}, #{metadata})")
       @azure.vm_manager.set_metadata(instance_id, metadata)
     end
 
@@ -208,7 +207,7 @@ module Bosh::AzureCloud
     # @return [String] opaque id later used by {#attach_disk}, {#detach_disk}, and {#delete_disk}
     def create_disk(size, cloud_properties, instance_id = nil)
       with_thread_name("create_disk(#{size})") do
-        logger.info("Create disk for vm #{instance_id}") unless instance_id.nil?
+        @logger.info("Create disk for vm #{instance_id}") unless instance_id.nil?
         validate_disk_size(size)
 
         @azure.disk_manager.create_disk(size/1024)
@@ -248,7 +247,7 @@ module Bosh::AzureCloud
           settings["disks"]["persistent"][disk_id] = volume_name
         end
 
-        logger.info("Attached `#{disk_id}' to `#{instance_id}'")
+        @logger.info("Attached `#{disk_id}' to `#{instance_id}'")
       end
     end
 
@@ -260,7 +259,7 @@ module Bosh::AzureCloud
       with_thread_name("snapshot_disk(#{disk_id},#{metadata})") do
         snapshot_id = @azure.disk_manager.snapshot_disk(disk_id, metadata)
 
-        logger.info("Take a snapshot disk `#{snapshot_id}' for `#{disk_id}'")
+        @logger.info("Take a snapshot disk `#{snapshot_id}' for `#{disk_id}'")
       end
     end
 
@@ -288,7 +287,7 @@ module Bosh::AzureCloud
 
         @azure.vm_manager.detach_disk(instance_id, disk_id)
 
-        logger.info("Detached `#{disk_id}' from `#{instance_id}'")
+        @logger.info("Detached `#{disk_id}' from `#{instance_id}'")
       end
     end
 

@@ -18,22 +18,11 @@ module Bosh::AzureCloud
     end
 
     def find_stemcell_by_name(name)
-      stemcell = stemcells.find do |image_name|
-        logger.debug "find #{image_name.name}"
-        image_name.name == name || image_name.name == name+".vhd"
-      end
-
-      cloud_error("Given image name '#{name}' does not exist!") if stemcell.nil?
-      stemcell
+      stemcells.find { |stemcell| stemcell.name == "#{name}.vhd" }
     end
 
     def has_stemcell?(name)
-      begin
-        find_stemcell_by_name name
-      rescue
-        return false
-      end
-      true
+      !find_stemcell_by_name(name).nil?
     end
 
     def delete_image(name)
@@ -41,7 +30,7 @@ module Bosh::AzureCloud
     end
 
     def stemcells
-      return @blob_manager.list_blobs(container_name)
+      @blob_manager.list_blobs(container_name)
     end
 
     def create_stemcell(image_path, cloud_properties)

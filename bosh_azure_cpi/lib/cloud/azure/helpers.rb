@@ -31,20 +31,14 @@ module Bosh::AzureCloud
     }
 
     def generate_instance_id(resource_group_name, agent_id)
-      instance_id = "bosh-#{resource_group_name}-#{agent_id}"
+      instance_id = "bosh-#{resource_group_name}--#{agent_id}"
     end
 
     def parse_resource_group_from_instance_id(instance_id)
-      instance_id[5..-41]
+      index = instance_id.rindex('--') - 1
+      instance_id[5..index]
     end
 
-    def symbolize_keys(hash)
-      hash.inject({}) do |h, (key, value)|
-        h[key.to_sym] = value.is_a?(Hash) ? symbolize_keys(value) : value
-        h
-      end
-    end
-    
     ##
     # Raises CloudError exception
     #
@@ -55,83 +49,90 @@ module Bosh::AzureCloud
       @logger.error(exception) if @logger && exception
       raise Bosh::Clouds::CloudError, message
     end
-    
-    def xml_content(xml, key, default = '')
-      content = default
-      node = xml.at_css(key)
-      content = node.text if node
-      content
-    end
 
-    def azure_cmd(cmd,logger)
-      logger.debug("execute command "+cmd)
-      exit_status=0
+    def azure_cmd(cmd)
+      @logger.info("Execute command #{cmd}")
+
+      exit_status = 0
       Open3.popen3(cmd) do |stdin, stdout, stderr, wait_thr|
-        exit_status= wait_thr.value
-        logger.debug("stdout is:" + stdout.read)
-        logger.debug("stderr is:" + stderr.read)
-        logger.debug("exit_status is:"+String(exit_status))
-        if exit_status!=0
-          logger.error("execute command fail Please try it manually to see more details")
+        exit_status = wait_thr.value
+        if exit_status == 0
+          @logger.debug("exit_status is: #{exit_status.to_s}")
+          @logger.debug("stdout is: #{stdout.read}")
+          @logger.debug("stderr is: #{stderr.read}")
+        else
+          @logger.info("Command failed. Please try it manually to see more details")
+          @logger.error("exit_status is: #{exit_status.to_s}")
+          @logger.error("stdout is: #{stdout.read}")
+          @logger.error("stderr is: #{stderr.read}")
         end
       end
-      return exit_status
+
+      exit_status
     end
 
-    def invoke_azure_js(args,logger,abort_on_error=true)
-      node_js_file = File.join(File.dirname(__FILE__),"azure_crp","azure_crp_compute.js")
-      cmd = "node #{node_js_file}".split(" ")
+    def invoke_azure_js(args, abort_on_error=true)
+      node_js_file = File.join(File.dirname(__FILE__), "azure_crp", "azure_crp_compute.js")
+      cmd = ["node", node_js_file]
       cmd.concat(args)
-      result  = {};
-      node_path=ENV['NODE_PATH']
-      node_path = "/usr/local/lib/node_modules" if not node_path or node_path.length==0
+      result = {}
+
+      node_path = ENV['NODE_PATH']
+      node_path = "/usr/local/lib/node_modules" if node_path.nil? or node_path.empty?
       
-      Open3.popen3({'NODE_PATH' =>node_path},*cmd) { |stdin, stdout, stderr, wait_thr|
+      Open3.popen3({'NODE_PATH' => node_path}, *cmd) { |stdin, stdout, stderr, wait_thr|
         data = ""
-        stdstr=""
+        stdstr = ""
         begin
-            while wait_thr.alive? do
-                IO.select([stdout])
-                data = stdout.read_nonblock(1024000)
-                logger.info(data)
-                stdstr+=data;
-                task_checkpoint
-            end
-            rescue Errno::EAGAIN
-            retry
-            rescue EOFError
+          while wait_thr.alive? do
+            IO.select([stdout])
+            data = stdout.read_nonblock(1024000)
+            @logger.info(data)
+            stdstr += data
+            task_checkpoint
+          end
+        rescue Errno::EAGAIN
+          retry
+        rescue EOFError
         end
 
-        errstr = stderr.read;
-        stdstr+=stdout.read
-        if errstr and errstr.length>0
-            errstr="\n \t\tPlease check if env NODE_PATH is correct\r"+errstr if errstr=~/Function.Module._load/
-            cloud_error(errstr);
-            return nil
+        errstr = stderr.read
+        stdstr += stdout.read
+        if errstr and errstr.length > 0
+          errstr = "\n\t\tPlease check if env NODE_PATH is correct\n#{errstr}"  if errstr=~/Function.Module._load/
+          cloud_error(errstr)
         end
+
         matchdata = stdstr.match(/##RESULTBEGIN##(.*)##RESULTEND##/im)
-        result = JSON(matchdata.captures[0]) if  matchdata
+        result = JSON(matchdata.captures[0]) if matchdata
         exitcode = wait_thr.value
-        logger.debug(result)
-        cloud_error("AuthorizationFailed please try azure login\n") if result["Failed"] and result["Failed"]["code"] =~/AuthorizationFailed/
-        cloud_error("Can't find token in ~/.azure/azureProfile.json or ~/.azure/accessTokens.json\nTry azure login    \n") if result["Failed"] and result["Failed"]["code"] =~/RefreshToken Fail/
+        @logger.debug(result)
 
-        return nil if result["Failed"];
-        return result["R"] if result["R"][0] == nil
-        return result["R"][0]
+        unless result["Failed"].nil?
+          cloud_error("AuthorizationFailed please try azure login\n") if result["Failed"]["code"] =~/AuthorizationFailed/
+          cloud_error("Can't find token in ~/.azure/azureProfile.json or ~/.azure/accessTokens.json\nTry azure login\n") if result["Failed"]["code"] =~/RefreshToken Fail/
+        end
+
+        ret = nil
+        if result["Failed"].nil?
+          ret = result["R"][0].nil? ? result["R"] : result["R"][0]
+        end
       }
     end
 
-    def invoke_azure_js_with_id(arg,logger)
-      task =arg[0]
-      id = arg[1]
-      logger.info("invoke azure js #{task} id #{id.to_s}")
+    def invoke_azure_js_with_id(arg)
+      task = arg[0]
+      instance_id = arg[1]
+
+      @logger.info("invoke azure js #{task} instance_id #{instance_id}")
       begin
-        resource_group_name = parse_resource_group_from_instance_id(id)
-        logger.debug("resource_group_name is #{resource_group_name}")
-        return invoke_azure_js(["-t",task,"-r",resource_group_name,id].concat(arg[2..-1]),logger)
-      rescue Exception => ex
-        cloud_error("error:"+ex.message+ex.backtrace.join("\n"))
+        resource_group_name = parse_resource_group_from_instance_id(instance_id)
+        @logger.debug("resource_group_name is #{resource_group_name}")
+        params = ["-t", task, "-r", resource_group_name, instance_id]
+        params.concat(arg[2..-1])
+        invoke_azure_js(params)
+      rescue Exception => e
+        cloud_error("Error: #{e.message}\n#{e.backtrace.join("\n")}")
       end
     end
 

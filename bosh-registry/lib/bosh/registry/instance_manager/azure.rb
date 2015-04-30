@@ -57,9 +57,10 @@ module Bosh::Registry
       end
 
       # Get the list of IPs belonging to this instance
-      # instance_id: vm_name, "bosh-RESOURCE_GROUP_NAME-AGENT_ID"
+      # instance_id: vm_name, "bosh-RESOURCE_GROUP_NAME--AGENT_ID"
       def instance_ips(instance_id)
-        resource_group_name = instance_id.match("^bosh-([^-.]*)-(.*)$")[1]
+        index = instance_id.rindex('--') - 1
+        resource_group_name = instance_id[5..index]
         get_ip_address(resource_group_name, instance_id)
       rescue NameError => e
         raise InstanceError, "AZURE error: #{e}"
@@ -85,6 +86,7 @@ module Bosh::Registry
 
       def get_token(force_refresh = false)
         if @token.nil? || (Time.at(@token["expires_on"].to_i) - Time.now) <= 0 || force_refresh
+          @logger.info("Trying to get/refresh Azure authentication token")
           params = {}
           params["api-version"] = @azure_properties["api_version"]
 
@@ -114,6 +116,7 @@ module Bosh::Registry
 
       def azure_rest_api(url)
         uri = URI(AZURE_ENVIRONMENTS[@azure_properties['environment']]['resourceManagerEndpointUrl'] + url + "?api-version=#{@azure_properties["api_version"]}")
+        @logger.info("Trying to call #{uri}")
 
         retried = false
         request = Net::HTTP::Get.new(uri.request_uri)

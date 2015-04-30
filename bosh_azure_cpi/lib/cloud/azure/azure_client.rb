@@ -8,6 +8,7 @@ module Bosh::AzureCloud
     include Helpers
 
     def initialize(azure_properties, registry, logger)
+      @logger = logger
       Azure::Core::Utility.initialize_external_logger(logger)
       Azure.configure do |config|
         config.subscription_id        = azure_properties['subscription_id']
@@ -19,10 +20,24 @@ module Bosh::AzureCloud
 
       container_name = azure_properties['container_name'] || 'bosh'
 
-      azure_cmd("azure login -u #{azure_properties['client_id']} -p '#{azure_properties['client_secret']}' --tenant #{azure_properties['tenant_id']} --service-principal --quiet",logger)
+      unless ENV.has_key?('HOME')
+        user = 'vcap'
+        user = azure_properties['ssh_user'] unless azure_properties['ssh_user'].nil?
+        ENV['HOME'] = "/home/#{user}"
+        @logger.info("Set HOME to #{ENV['HOME']}")
+      end
+      unless ENV.has_key?('PATH')
+        ENV['PATH'] = "/usr/local/bin"
+      else
+        ENV['PATH'] = "#{ENV['PATH']}:/usr/local/bin" unless ENV['PATH'].include?("/usr/local/bin")
+      end
+      @logger.info("Set PATH to #{ENV['PATH']}")
+
+      azure_cmd("azure config mode arm")
+      azure_cmd("azure login -u #{azure_properties['client_id']} -p '#{azure_properties['client_secret']}' --tenant #{azure_properties['tenant_id']} --service-principal --quiet")
 
       if azure_properties['subscription_id']
-        azure_cmd("azure account set #{azure_properties['subscription_id']}", logger)
+        azure_cmd("azure account set #{azure_properties['subscription_id']}")
       end
 
       @blob_manager           = Bosh::AzureCloud::BlobManager.new

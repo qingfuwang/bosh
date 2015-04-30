@@ -17,11 +17,8 @@ module Bosh::AzureCloud
     end
 
     def container_exist?(container_name)
-      @blob_service_client.list_containers.each do |container|
-        return true if (container.name.eql?(container_name))
-      end
-
-      return false
+      container = @blob_service_client.list_containers.find { |container| container.name.eql?(container_name) }
+      !container.nil?
     end
 
     def delete_blob(container_name, blob_name)
@@ -30,18 +27,15 @@ module Bosh::AzureCloud
       })
     end
 
-    def get_blob_uri(container_name,blob_name)
-	return Azure.config.storage_blob_host+"/#{container_name}/"+blob_name
+    def get_blob_uri(container_name, blob_name)
+      "#{Azure.config.storage_blob_host}/#{container_name}/#{blob_name}"
     end
 
     def get_blob_size(uri)
-	blob_name = uri.split("/")[4..-1]
-        if blob_name.length>1
-          blob_name = blob_name.join("/")
-        end
-	container = uri.split("/")[3..3]
-	prop =  @blob_service_client.get_blob_properties(container,blob_name)
-	return prop.properties[:content_length]
+      container = uri.split("/")[3..3][0]
+      blob_name = uri.split("/")[4..-1][0]
+      prop = @blob_service_client.get_blob_properties(container, blob_name)
+      prop.properties[:content_length]
     end
 
     def delete_blob_snapshot(container_name, blob_name, snapshot_time)
@@ -126,11 +120,9 @@ module Bosh::AzureCloud
     end
 
     def blob_exist?(container_name, blob_name)
-      list_blobs(container_name).each do |blob|
-        return true if (blob.name.eql?(blob_name))
-      end
+      blob = list_blobs(container_name).find { |blob| blob.name.eql?(blob_name) }
 
-      return false
+      !blob.nil?
     end
 
     def list_blobs(container_name)
