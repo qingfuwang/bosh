@@ -14,7 +14,7 @@ echo "acpiphp" >> $chroot/etc/modules
 packages="nodejs-legacy npm"
 pkg_mgr install $packages
 
-cli_version=0.8.16
+cli_version=0.9.1
 run_in_chroot $chroot "
 npm install -g azure-cli@${cli_version} -g
 npm install optimist -g

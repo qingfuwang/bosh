@@ -62,10 +62,10 @@ function addRetry(task, retries) {
 var azureCommand = function(p, callback) {
 
     var docommand = function(docommandcb) {
+        p.push('--json');
         var exec = require('child_process').execFile;
         _log("excute command azure " + p.join(" "));
         exec("azure", p, function(err, stdout, stderr) {
-            //_log(stdout);
             if (stderr)
                 _log(stderr);
             if (stderr.indexOf("'group' is not an azure command") > -1 || stderr.indexOf("'resource' is not an azure command") > -1) {
@@ -208,7 +208,7 @@ var waitDeploymentSuccess = function(doDeployTask, id, resourcegroup, deployment
                 case "Failed":
                     _log("deployment failed  collect  log after 30 seconds");
                     setTimeout(function() {
-                        azureCommand(["group", "log", "show", "-n", resourcegroup, "-d", deploymentname.id, "--json"],
+                        azureCommand(["group", "log", "show", "-n", resourcegroup, "-d", deploymentname.id],
                             function(err, msg) {
                                 if (err) {
                                     finishedCallback(err, msg);
@@ -242,7 +242,7 @@ var waitDeploymentSuccess = function(doDeployTask, id, resourcegroup, deployment
 
 var findResource = function(resourcegroup, type, propertyId, value, REFresource, finishedCallback) {
     var IPName = null;
-    var command = ["resource", "list", "-g", resourcegroup, "--json"];
+    var command = ["resource", "list", "-g", resourcegroup];
     if (type && type.length > 0)
         command = command.concat(["-r", type]);
 
@@ -338,7 +338,6 @@ var deleteResource = function(resourcegroup, name, type, finishedCallback) {
 var getResource = function(resourcegroup, name, type, finishedCallback) {
   getCurrentSubscription({"id":""},function(err,id){
   doAzureResourceManage(id, resourcegroup, "/providers/"+type+"/" + name, "", "GET", api_version,
-    //azureCommand(["resource", "show", resourcegroup, name, type, api_version, "--json"],
         function(err, msg) {
             if (!err) {
                 var result = JSON.parse(msg);
@@ -387,7 +386,7 @@ var updateTag = function(resourcegroup, name, type, resource, tag, finishedCallb
 
 var setIPlabelName = function(resourcegroup,  ip, labelname, finishedCallback) {
 
-    azureCommand(["resource", "show", resourcegroup, ip, "Microsoft.Network/publicIPAddresses", api_version, "--json"],
+    azureCommand(["resource", "show", resourcegroup, ip, "Microsoft.Network/publicIPAddresses", api_version],
         function(err, msg) {
             if (err) {
                 finishedCallback(err, msg);
@@ -406,14 +405,14 @@ var setIPlabelName = function(resourcegroup,  ip, labelname, finishedCallback) {
 };
 var bindIP = function(resourcegroup, nicname, ip, finishedCallback) {
 
-    azureCommand(["resource", "show", resourcegroup, ip, "Microsoft.Network/publicIPAddresses", api_version, "--json"],
+    azureCommand(["resource", "show", resourcegroup, ip, "Microsoft.Network/publicIPAddresses", api_version],
         function(err, msg) {
             if (err) {
                 finishedCallback(err, msg);
                 return;
             }
             var ipconfigid = JSON.parse(msg).id;
-            azureCommand(["resource", "show", resourcegroup, nicname, "Microsoft.Network/networkInterfaces", api_version, "--json"],
+            azureCommand(["resource", "show", resourcegroup, nicname, "Microsoft.Network/networkInterfaces", api_version],
                 function(err, msg) {
                     if (err) {
                         finishedCallback(err, msg);
@@ -434,14 +433,14 @@ var bindIP = function(resourcegroup, nicname, ip, finishedCallback) {
 
 var addSecurityGroup = function(resourcegroup, nicname, group, finishedCallback) {
 
-    azureCommand(["resource", "show", resourcegroup, group, "Microsoft.Network/networkSecurityGroups", api_version, "--json"],
+    azureCommand(["resource", "show", resourcegroup, group, "Microsoft.Network/networkSecurityGroups", api_version],
         function(err, msg) {
             if (err) {
                 finishedCallback(err, msg);
                 return;
             }
             var id = JSON.parse(msg).id;
-            azureCommand(["resource", "show", resourcegroup, nicname, "Microsoft.Network/networkInterfaces", api_version, "--json"],
+            azureCommand(["resource", "show", resourcegroup, nicname, "Microsoft.Network/networkInterfaces", api_version],
                 function(err, msg) {
                     if (err) {
                         finishedCallback(err, msg);
@@ -528,7 +527,7 @@ var getCurrentSubscription = function(subscriptionId, finishedCallback) {
            return;
        }
     }
-    azureCommand(["account", "list", "--json"], function(err, msg) {
+    azureCommand(["account", "list"], function(err, msg) {
         if (err) {
             finishedCallback(err, msg);
         }
@@ -711,7 +710,7 @@ var main = function() {
                 });
             tasks.push(
                 function(callback) {
-                    azureCommand(["resource", "list", "-g", resourcegroup, "--json", "-r", resourcetype], function(err, msg) {
+                    azureCommand(["resource", "list", "-g", resourcegroup, "-r", resourcetype], function(err, msg) {
                         if (err) {
                             callback(err, msg);
                             return;
@@ -772,7 +771,7 @@ var main = function() {
             var labelname = argv._[1];
             tasks.push( 
                 function(callback) {
-                    azureCommand(["group","list","--json"],function(err,msg){
+                    azureCommand(["group", "list"],function(err,msg){
                        if(err){callback(err,msg);return}
                        var location = JSON.parse(msg).filter(function(t){return t.name==resourcegroup})[0].location
                        azureCommand(["resource","create",resourcegroup,"-n",ipname,"Microsoft.Network/publicIPAddresses",location,"2014-12-01-preview",
@@ -811,7 +810,7 @@ var main = function() {
         case "getlocation":
           tasks.push(
                 function(callback) {
-                    azureCommand(["group","list","--json"],function(err,msg){
+                    azureCommand(["group", "list"],function(err,msg){
                         if(!err){
                         var location = JSON.parse(msg).filter(function(t){return t.name==resourcegroup})[0].location;
                         _result(location);
@@ -932,8 +931,6 @@ var main = function() {
             }));
             _log("##RESULTEND##")
         });
-
-
 };
 
 
