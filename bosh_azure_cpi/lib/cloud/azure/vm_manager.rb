@@ -103,22 +103,42 @@ module Bosh::AzureCloud
     end
 
     def find(instance_id)
-      vm= JSON(invoke_azure_js_with_id(["get", instance_id, "Microsoft.Compute/virtualMachines"]))
-      publicip = invoke_azure_js_with_id(["get", instance_id, "Microsoft.Network/publicIPAddresses"])
-      publicip = JSON(publicip) unless publicip.nil?
-      dipaddress = publicip.nil? ? nil : publicip["properties"]["ipAddress"]
+      instance = nil
 
-      nic = JSON(invoke_azure_js_with_id(["get", instance_id, "Microsoft.Network/networkInterfaces"]))["properties"]["ipConfigurations"][0]
-      return {
-        "data_disks"    => vm["properties"]["storageProfile"]["dataDisks"],
-        "ipaddress"     => nic["properties"]["privateIPAddress"],
-        "vm_name"       => vm["name"],
-        "dipaddress"    => dipaddress,
-        "status"        => vm["properties"]["provisioningState"]
-      }
+      begin
+        ret = invoke_azure_js_with_id(["get", instance_id, "Microsoft.Compute/virtualMachines"])
+        unless ret.nil?
+          vm = JSON(ret)
+          publicip = invoke_azure_js_with_id(["get", instance_id, "Microsoft.Network/publicIPAddresses"])
+          publicip = JSON(publicip) unless publicip.nil?
+          dipaddress = publicip.nil? ? nil : publicip["properties"]["ipAddress"]
+          data_disks = []
+          vm["properties"]["storageProfile"]["dataDisks"].each do |disk|
+            data_disks << {
+              "name" => disk["name"],
+              "lun"  => disk["lun"],
+              "uri"  => disk["vhd"]["uri"]
+            }
+          end
+
+          nic = JSON(invoke_azure_js_with_id(["get", instance_id, "Microsoft.Network/networkInterfaces"]))["properties"]["ipConfigurations"][0]
+          instance = {
+            "data_disks"    => data_disks,
+            "ipaddress"     => nic["properties"]["privateIPAddress"],
+            "vm_name"       => vm["name"],
+            "dipaddress"    => dipaddress,
+            "status"        => vm["properties"]["provisioningState"]
+          }
+        end
+      rescue => e
+        @logger.debug("Cannot find instance by id #{instance_id}: #{e.message}")
+      end
+
+      instance
     end
 
     def delete(instance_id)
+      @logger.info("delete(#{instance_id})")
       shutdown(instance_id)
       invoke_azure_js_with_id(["delete", instance_id, "Microsoft.Compute/virtualMachines"])
       invoke_azure_js_with_id(["delete", instance_id, "Microsoft.Network/loadBalancers"])
@@ -127,18 +147,22 @@ module Bosh::AzureCloud
     end
 
     def reboot(instance_id)
-       invoke_azure_js_with_id(["reboot", instance_id])
+      @logger.info("reboot(#{instance_id})")
+      invoke_azure_js_with_id(["restart", instance_id])
     end
 
     def start(instance_id)
-       invoke_azure_js_with_id(["start", instance_id])
+      @logger.info("start(#{instance_id})")
+      invoke_azure_js_with_id(["start", instance_id])
     end
 
     def shutdown(instance_id)
+      @logger.info("shutdown(#{instance_id})")
       invoke_azure_js_with_id(["stop", instance_id])
     end
 
     def set_metadata(instance_id, metadata)
+      @logger.info("set_metadata(#{instance_id}, #{metadata})")
       tag = ""
       metadata.each_pair { |key, value| tag << "#{key}=#{value};" }
       invoke_azure_js_with_id(["setTag", instance_id, "Microsoft.Compute/virtualMachines", tag[0..-2]])
@@ -159,22 +183,24 @@ module Bosh::AzureCloud
     # @param [String] disk_name disk name
     # @return [String] volume name. "/dev/sd[c-r]"
     def attach_disk(instance_id, disk_name)
-      disk_uri= @disk_manager.get_disk_uri(disk_name)
+      @logger.info("attach_disk(#{instance_id}, #{disk_name})")
+      disk_uri = @disk_manager.get_disk_uri(disk_name)
       invoke_azure_js_with_id(["adddisk", instance_id, disk_uri])
-      get_volume_name(instance_id, disk_uri)
+      get_volume_name(instance_id, disk_name)
     end
     
     def detach_disk(instance_id, disk_name)
+      @logger.info("detach_disk(#{instance_id}, #{disk_name})")
       disk_uri= @disk_manager.get_disk_uri(disk_name)
       invoke_azure_js_with_id(["rmdisk", instance_id, disk_uri])
     end
     
     def get_disks(instance_id)
-      @logger.debug("get_disks(#{instance_id})")
+      @logger.info("get_disks(#{instance_id})")
       vm = find(instance_id) || cloud_error('Given instance id does not exist')
       data_disks = []
-      vm.data_disks.each do |disk|
-        data_disks << disk[:name]
+      vm['data_disks'].each do |disk|
+        data_disks << disk['name']
       end
       data_disks
     end
@@ -189,7 +215,7 @@ module Bosh::AzureCloud
     end
     
     def get_volume_name(instance_id, disk_name)
-      data_disk = find(instance_id)["data_disks"].find { |disk| disk["vhd"]["uri"] == disk_name}
+      data_disk = find(instance_id)["data_disks"].find { |disk| disk["name"] == disk_name}
       data_disk || cloud_error('Given disk name is not attached to given instance id')
       lun = get_disk_lun(data_disk)
       @logger.info("get_volume_name return lun #{lun}")
@@ -202,4 +228,3 @@ module Bosh::AzureCloud
     
   end
 end
-

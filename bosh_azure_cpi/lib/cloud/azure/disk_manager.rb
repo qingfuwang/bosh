@@ -16,13 +16,15 @@ module Bosh::AzureCloud
     end
 
     def delete_disk(disk_name)
+      @logger.info("delete_disk(#{disk_name})")
       @blob_manager.delete_blob(container_name, "#{disk_name}.vhd")
     end
 
-    def snapshot_disk(disk_id, metadata)
+    def snapshot_disk(disk_name, metadata)
+      @logger.info("snapshot_disk(#{disk_name}, #{metadata})")
       snapshot_disk_name = "bosh-disk-#{SecureRandom.uuid}"
-      disk_blob_name = "#{disk_id}.vhd"
-      @blob_manager.snapshot_blob(blob_container_name, disk_blob_name, metadata, "#{snapshot_disk_name}.vhd")
+      disk_blob_name = "#{disk_name}.vhd"
+      @blob_manager.snapshot_blob(container_name, disk_blob_name, metadata, "#{snapshot_disk_name}.vhd")
       snapshot_disk_name
     end
 
@@ -32,32 +34,31 @@ module Bosh::AzureCloud
     # @param [Integer] size disk size in GB
     # @return [String] disk name
     def create_disk(size)
+      @logger.info("create_disk(#{size})")
       disk_name = "bosh-disk-#{SecureRandom.uuid}"
       logger.info("Start to create an empty vhd blob: blob_name: #{disk_name}.vhd")
       @blob_manager.create_empty_vhd_blob(container_name, "#{disk_name}.vhd", size)
       disk_name
     end
 
-    def has_disk?(disk_id)
-      ret = true
-      begin
-        @blob_manager.get_blob_properties(container_name, "#{disk_id}.vhd")
-      rescue
-        ret = false
-      end
-      ret
+    def has_disk?(disk_name)
+      @logger.info("has_disk?(#{disk_name})")
+      @blob_manager.blob_exist?(container_name, "#{disk_name}.vhd")
     end
 
     def get_disk_uri(disk_name)
+      @logger.info("get_disk_uri(#{disk_name})")
       @blob_manager.get_blob_uri(@container_name, "#{disk_name}.vhd")
     end
 
-    def get_new_osdisk_uri(vm_id)
-      destination_blob = vm_id + Time.now.to_i.to_s + "_os_disk.vhd"
+    def get_new_osdisk_uri(instance_id)
+      @logger.info("get_new_osdisk_uri(#{instance_id})")
+      destination_blob = instance_id + Time.now.to_i.to_s + "_os_disk.vhd"
       @blob_manager.get_blob_uri(@container_name, destination_blob)
     end
 
     def disks
+      @logger.info("disks")
       disks = @blob_manager.list_blobs(@container_name).select{
         |d| return d.name = ~/vhd$/
       }.map { |d|

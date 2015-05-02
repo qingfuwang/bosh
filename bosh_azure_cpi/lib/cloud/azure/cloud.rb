@@ -141,7 +141,7 @@ module Bosh::AzureCloud
     def has_vm?(instance_id)
       with_thread_name("has_vm?(#{instance_id})") do
         vm = @azure.vm_manager.find(instance_id)
-        !vm.nil? && vm.status != "DeletingVM"
+        !vm.nil? && vm['status'] != 'deleting'
       end
     end
 
@@ -259,7 +259,8 @@ module Bosh::AzureCloud
       with_thread_name("snapshot_disk(#{disk_id},#{metadata})") do
         snapshot_id = @azure.disk_manager.snapshot_disk(disk_id, metadata)
 
-        @logger.info("Take a snapshot disk `#{snapshot_id}' for `#{disk_id}'")
+        @logger.info("Take a snapshot disk '#{snapshot_id}' for '#{disk_id}'")
+        snapshot_id
       end
     end
 

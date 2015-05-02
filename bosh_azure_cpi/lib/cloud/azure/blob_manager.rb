@@ -13,25 +13,30 @@ module Bosh::AzureCloud
     end
 
     def create_container(container_name)
+      @logger.info("create_container(#{container_name})")
       @blob_service_client.create_container(container_name) unless container_exist?(container_name)
     end
 
     def container_exist?(container_name)
+      @logger.info("container_exist?(#{container_name})")
       container = @blob_service_client.list_containers.find { |container| container.name.eql?(container_name) }
       !container.nil?
     end
 
     def delete_blob(container_name, blob_name)
+      @logger.info("delete_blob(#{container_name}, #{blob_name})")
       @blob_service_client.delete_blob(container_name, blob_name, {
         :delete_snapshots => :include
       })
     end
 
     def get_blob_uri(container_name, blob_name)
+      @logger.info("get_blob_uri(#{container_name}, #{blob_name})")
       "#{Azure.config.storage_blob_host}/#{container_name}/#{blob_name}"
     end
 
     def get_blob_size(uri)
+      @logger.info("get_blob_size?(#{uri})")
       container = uri.split("/")[3..3][0]
       blob_name = uri.split("/")[4..-1][0]
       prop = @blob_service_client.get_blob_properties(container, blob_name)
@@ -39,12 +44,14 @@ module Bosh::AzureCloud
     end
 
     def delete_blob_snapshot(container_name, blob_name, snapshot_time)
+      @logger.info("delete_blob_snapshot(#{container_name}, #{blob_name}, #{snapshot_time})")
       @blob_service_client.delete_blob(container_name, blob_name, {
         :snapshot => snapshot_time
       })
     end
 
     def create_block_blob(container_name, file_path, blob_name)
+      @logger.info("create_block_blob(#{container_name}, #{file_path}, #{blob_name})")
       block_list = []
       counter    = 1
 
@@ -69,6 +76,7 @@ module Bosh::AzureCloud
     end
 
     def create_page_blob(container_name, file_path, blob_name)
+      @logger.info("create_page_blob(#{container_name}, #{file_path}, #{blob_name})")
       begin
         blob_size = File.lstat(file_path).size
         logger.info("create_page_blob: blob_name: #{blob_name}, blob_size: #{blob_size}")
@@ -89,6 +97,7 @@ module Bosh::AzureCloud
     # @param [Integer] blob_size_in_gb blob size in GB
     # @return [void]
     def create_empty_vhd_blob(container_name, blob_name, blob_size_in_gb)
+      @logger.info("create_empty_vhd_blob(#{container_name}, #{blob_name}, #{blob_size_in_gb})")
       blob_created = false
       begin
         logger.info("create_empty_vhd_blob: Start to generate vhd footer")
@@ -120,22 +129,25 @@ module Bosh::AzureCloud
     end
 
     def blob_exist?(container_name, blob_name)
+      logger.info("blob_exist?(#{container_name}, #{blob_name})")
       blob = list_blobs(container_name).find { |blob| blob.name.eql?(blob_name) }
 
       !blob.nil?
     end
 
     def list_blobs(container_name)
+      logger.info("list_blobs(#{container_name})")
       @blob_service_client.list_blobs(container_name)
     end
 
     def get_blob(container_name, blob_name, file_path)
+      logger.info("get_blob(#{container_name}, #{blob_name}, #{file_path})")
       blob, content = @blob_service_client.get_blob(container_name, blob_name)
       File.open(file_path, 'wb') { |f| f.write(content) }
     end
 
     def snapshot_blob(container_name, blob_name, metadata, snapshot_blob_name)
-      logger.info("Taking snapshot for the blob #{container_name}/#{blob_name}")
+      logger.info("snapshot_blob(#{container_name}, #{blob_name}, #{metadata}, #{snapshot_blob_name})")
       snapshot_time = @blob_service_client.create_blob_snapshot(container_name, blob_name, {:metadata => metadata})
       logger.debug("Snapshot time: #{snapshot_time}")
 

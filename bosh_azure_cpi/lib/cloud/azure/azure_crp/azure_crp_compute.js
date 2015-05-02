@@ -25,11 +25,8 @@ function _result(str) {
 }
 
 function _log(str) {
-    //_logStr.push(String(new Date().toISOString()) + "  " + str);
     console.log(str);
 }
-
-
 
 function addRetry(task, retries) {
     var retry = require('retry')
@@ -56,15 +53,13 @@ function addRetry(task, retries) {
             });
         }
     });
-
 }
 
 var azureCommand = function(p, callback) {
-
     var docommand = function(docommandcb) {
         p.push('--json');
         var exec = require('child_process').execFile;
-        _log("excute command azure " + p.join(" "));
+        _log("execute command azure " + p.join(" "));
         exec("azure", p, function(err, stdout, stderr) {
             if (stderr)
                 _log(stderr);
@@ -78,20 +73,20 @@ var azureCommand = function(p, callback) {
                 return;
             }
             if (stderr.indexOf("ENOMEM, not enough memory") > -1) {
-                docommandcb(RETRY, "do command retry not enought memory " + JSON.stringify(p));
+                docommandcb(RETRY, "do command retry not enough memory " + JSON.stringify(p));
                 return;
             }
             if (stderr.indexOf("gateway did not receive a response from") > -1) {
-                docommandcb(RETRY, "do command retry not receive resposne " + JSON.stringify(p));
+                docommandcb(RETRY, "do command retry not receive response " + JSON.stringify(p));
                 return;
             }
             if(stderr.match(/connect ENETUNREACH/))
             {
-               docommandcb(RETRY, "unknow error happens " + JSON.stringify(p));
+               docommandcb(RETRY, "unknown error happens " + JSON.stringify(p));
                return;
             }
             if (stderr.match(/^An error has occurred/)) {
-                docommandcb(RETRY, "unknow error happens " + JSON.stringify(p));
+                docommandcb(RETRY, "unknown error happens " + JSON.stringify(p));
                 return;
             }
             docommandcb(err == null ? stderr : err, stdout + stderr);
@@ -172,7 +167,6 @@ var doDeploy = function(resourcegroup, templatefile, parameters, deployname, sid
     azureCommand(["group", "deployment", "create", "-g", resourcegroup, "-n", deployname.id, "-f", templatefile, "-p", formatParameter(templatefile, parameters)], finishedCallback);
 };
 
-
 var waitDeploymentSuccess = function(doDeployTask, id, resourcegroup, deploymentname, finishedCallback) {
     if (!deploymentname.id) {
         deploymentname.id = String((new Date).getTime()) + "deploy"
@@ -232,13 +226,10 @@ var waitDeploymentSuccess = function(doDeployTask, id, resourcegroup, deployment
                     }, 30000);
                     break;
                 default:
-                    finishedCallback(ABORT, "unknow stat:" + provisioningState);
+                    finishedCallback(ABORT, "unknown state:" + provisioningState);
             }
         });
 };
-
-
-
 
 var findResource = function(resourcegroup, type, propertyId, value, REFresource, finishedCallback) {
     var IPName = null;
@@ -324,7 +315,7 @@ var deleteResource = function(resourcegroup, name, type, finishedCallback) {
     azureCommand(["resource", "delete", resourcegroup, name, type, api_version, "--quiet"],
         function(err, msg) {
             if (!err) {
-                finishedCallback(err, " getresource done");
+                finishedCallback(err, "delete resource done");
                 return;
             }
             if (msg.indexOf("Resource does not exist") > -1)
@@ -362,11 +353,13 @@ var attachVMDisk = function(resourcegroup, vmname, vm, vhd, finishedCallback) {
             break;
         }
     }
+    var res = vhd.split("/");
+    var name = res[res.length - 1];
     var disk = {
         "vhd": {
             "uri": vhd
         },
-        "name": "disk_" + (new Date).getTime(),
+        "name": name.substring(0, name.length - 4),
         "lun": lun,
         "createOption": "attach"
     };
@@ -383,9 +376,7 @@ var updateTag = function(resourcegroup, name, type, resource, tag, finishedCallb
     ], finishedCallback);
 };
 
-
 var setIPlabelName = function(resourcegroup,  ip, labelname, finishedCallback) {
-
     azureCommand(["resource", "show", resourcegroup, ip, "Microsoft.Network/publicIPAddresses", api_version],
         function(err, msg) {
             if (err) {
@@ -404,7 +395,6 @@ var setIPlabelName = function(resourcegroup,  ip, labelname, finishedCallback) {
         
 };
 var bindIP = function(resourcegroup, nicname, ip, finishedCallback) {
-
     azureCommand(["resource", "show", resourcegroup, ip, "Microsoft.Network/publicIPAddresses", api_version],
         function(err, msg) {
             if (err) {
@@ -432,7 +422,6 @@ var bindIP = function(resourcegroup, nicname, ip, finishedCallback) {
 };
 
 var addSecurityGroup = function(resourcegroup, nicname, group, finishedCallback) {
-
     azureCommand(["resource", "show", resourcegroup, group, "Microsoft.Network/networkSecurityGroups", api_version],
         function(err, msg) {
             if (err) {
@@ -456,13 +445,11 @@ var addSecurityGroup = function(resourcegroup, nicname, group, finishedCallback)
                     doAzureResourceManage(id.split("/")[2], resourcegroup, "/providers/microsoft.network/networkInterfaces/" + nicname, '', 'PUT', api_version, finishedCallback, JSON.stringify(property));
                 });
         });
-
 };
 
-
-var dettachVMDisk = function(resourcegroup, vmname, vm, vhd, finishedCallback) {
+var detachVMDisk = function(resourcegroup, vmname, vm, vhd, finishedCallback) {
     var property = vm.properties;
-    _log("remove" + vhd);
+    _log("Detach VM data disk: " + vhd);
     var newdisks = property.storageProfile.dataDisks.filter(function(d) {
         return d.vhd.uri.indexOf(vhd) == -1;
     });
@@ -489,7 +476,6 @@ var getToken = function(subscriptionId) {
             return t.isDefault && Date.parse(t.accessToken.expiresAt) - (new Date()) > 0;
         });
     }
-
 };
 
 var refreshTokenTask = function(finishedCallback) {
@@ -540,7 +526,6 @@ var getCurrentSubscription = function(subscriptionId, finishedCallback) {
     });
 };
 
-
 var doVMTask = function(subscriptionId, resourcegroup, name, op, method, finishedCallback) {
     doAzureResourceManage(subscriptionId, resourcegroup, '/providers/Microsoft.Compute/virtualMachines/' + name + "/", op, method, api_version, function(err, msg) {
         finishedCallback(err, msg);
@@ -552,8 +537,6 @@ var doStorageAccontTask = function(subscriptionId, resourcegroup, name, op, meth
 }
 
 var doAzureResourceManage = function(subscriptionId, resourcegroup, name, op, method, api_version, finishedCallback, body) {
-    //console.log(process.argv)
-
     //https: //management.azure.com/subscriptions/xxx/resourceGroups/xx/providers/Microsoft.Storage/storageAccounts/xx/listKeys?api-version=2014-12-01-preview
     var body_content = '{}'
     if (typeof(body) != 'undefined' && body) {
@@ -565,8 +548,9 @@ var doAzureResourceManage = function(subscriptionId, resourcegroup, name, op, me
     httpRequest.headers = {};
     httpRequest.headers['Content-Type'] = 'application/json; charset=utf-8';
     httpRequest.url = 'https://management.azure.com/subscriptions/' + subscriptionId + '/resourceGroups/' + resourcegroup + '/' + name+"/" ;
-    if(op&&op.length>0)
-    httpRequest.url +=op
+    if(op && op.length > 0) {
+      httpRequest.url += op
+    }
     var queryParameters = [];
     queryParameters.push('api-version=' + (api_version));
     if (queryParameters.length > 0) {
@@ -598,7 +582,6 @@ var doAzureResourceManage = function(subscriptionId, resourcegroup, name, op, me
     }
     dotask = addRetry([restapi_task], 10)[0];
     dotask(finishedCallback);
-     
 };
 
 var main = function() {
@@ -723,11 +706,11 @@ var main = function() {
                                 callback(RETRY, "resource not deleted");
                             }
                             else {
-                                callback(null, "resouce deleted");
+                                callback(null, "resource deleted");
                             }
                         }
                         else {
-                            callback(null, "resouce deleted");
+                            callback(null, "resource deleted");
                         }
                     })
                 });
@@ -895,7 +878,7 @@ var main = function() {
 
             tasks.push(
                 function(callback) {
-                    dettachVMDisk(resourcegroup, vmname, resource, vhduri, callback);
+                    detachVMDisk(resourcegroup, vmname, resource, vhduri, callback);
                 });
             tasks.push(
                 function(callback) {
@@ -906,10 +889,9 @@ var main = function() {
         default:
             tasks.push(
                 function(callback) {
-                    callback("unknown command", "unkown command")
+                    callback("unknown command", "unknown command")
                 }
             );
-
     }
 
     tasks = addRetry(tasks, task == "deploy" ? 60 : 20)
@@ -933,6 +915,4 @@ var main = function() {
         });
 };
 
-
 main();
-
