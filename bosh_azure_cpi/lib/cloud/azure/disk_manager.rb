@@ -53,7 +53,7 @@ module Bosh::AzureCloud
 
     def get_new_osdisk_uri(instance_id)
       @logger.info("get_new_osdisk_uri(#{instance_id})")
-      destination_blob = instance_id + Time.now.to_i.to_s + "_os_disk.vhd"
+      destination_blob = instance_id + "_os_disk.vhd"
       @blob_manager.get_blob_uri(@container_name, destination_blob)
     end
 

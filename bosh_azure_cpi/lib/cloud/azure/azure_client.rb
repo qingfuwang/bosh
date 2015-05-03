@@ -35,6 +35,16 @@ module Bosh::AzureCloud
 
       azure_cmd("azure config mode arm")
       azure_cmd("azure login -u #{azure_properties['client_id']} -p '#{azure_properties['client_secret']}' --tenant #{azure_properties['tenant_id']} --service-principal --quiet")
+      args = [
+               '-t',
+               'init',
+               '-r',
+               azure_properties['resource_group_name'],
+               azure_properties['client_id'],
+               azure_properties['client_secret'],
+               azure_properties['tenant_id']
+             ]
+      invoke_azure_js(args)
 
       if azure_properties['subscription_id']
         azure_cmd("azure account set #{azure_properties['subscription_id']}")
