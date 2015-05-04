@@ -18,17 +18,6 @@ var api_version = "2014-12-01-preview";
 var get_log_api_version = "2014-04-01-preview"
 var _resultStr = [];
 var _logStr = [];
-var authClientId = '';
-var authClientSecret = '';
-var authTenantId = '';
-
-var initializeAzure = function (clientId, clientSerect, tenantId, finishedCallback) {
-    authClientId = clientId;
-    authClientSecret = clientSerect;
-    authTenantId = tenantId;
-    _log("Initialize Azure with clientId, clientSerect and tenantId")
-    finishedCallback(null, "");
-}
 
 function _result(str) {
     _resultStr.push(str);
@@ -134,7 +123,6 @@ var formatParameter = function(templatefile, parameters) {
     parameters["NatRules"] = [];
     parameters["NatRulesRef"] = [];
     Object.keys(parameters).forEach(function(key) {
-
         if (key == "TcpEndPoints" || key == "UdpEndPoints") {
             var isTcp = key == "TcpEndPoints";
             var lbName = parameters["lbName"];
@@ -495,9 +483,9 @@ var refreshTokenTask = function(finishedCallback) {
           finishedCallback(null, "done");
          return;
       }
-      _log("Refresh token...")
-      azureCommand(["login", "-u", authClientId, "-p", authClientSecret, "--tenant", authTenantId, "--service-principal", "--quiet"], function(err, msg) {
-        finishedCallback(err, msg);
+      _log("Refresh token...");
+      azureCommand(["group", "list"], function(err, msg) {
+        finishedCallback(err, "");
       });
    }catch(ex){
      ex.code="RefreshToken Fail "+ex.code
@@ -607,13 +595,6 @@ var main = function() {
     );
     _log("parameters " + argv._);
     switch (task) {
-        case "init":
-            tasks.push(
-                function(callback) {
-                    initializeAzure(argv._[0], argv._[1], argv._[2], callback);
-                }
-            );
-            break;
         case "deploy":
             var template = argv._[0];
             var subscriptionId = {

@@ -12,22 +12,25 @@ module Bosh::AzureCloud
     def create(uuid, stemcell_uri, cloud_opts, network_configurator, resource_pool)
       instance_id = generate_instance_id(cloud_opts["resource_group_name"], uuid)
 
-      location_opts = [
-              "-t",
-              "get",
-              "-r",
-              cloud_opts['resource_group_name'],
-              @storage_account_name,
-              "Microsoft.Storage/storageAccounts"
-            ]
-      location = JSON(invoke_azure_js(location_opts))["location"]
+      if @location.nil?
+        location_opts = [
+                "-t",
+                "get",
+                "-r",
+                cloud_opts['resource_group_name'],
+                @storage_account_name,
+                "Microsoft.Storage/storageAccounts"
+              ]
+        @location = JSON(invoke_azure_js(location_opts))["location"]
+      end
+
       params = {
         :vmName              => instance_id,
         :nicName             => instance_id,
         :adminUserName       => cloud_opts['ssh_user'],
         :imageUri            => stemcell_uri,
-        :osvhdUri            => @disk_manager.get_new_osdisk_uri(instance_id),
-        :location            => location,
+        :osvhdUri            => @disk_manager.get_new_os_disk_uri(instance_id),
+        :location            => @location,
         :vmSize              => resource_pool['instance_type'],
         :storageAccountName  => @storage_account_name,
         :customData          => get_user_data(instance_id, network_configurator.dns),
@@ -82,10 +85,10 @@ module Bosh::AzureCloud
           "lbName"                  => instance_id,
           "publicIPAddressName"     => ipname,
           "nicName"                 => instance_id,
-          "virtualNetworkName"      => "vnet",
-          "TcpEndPoints"            => network_configurator.tcp_endpoints,
-          "UdpEndPoints"            => network_configurator.udp_endpoints
+          "virtualNetworkName"      => "vnet"
         }
+        p["TcpEndPoints"] = network_configurator.tcp_endpoints unless network_configurator.tcp_endpoints.empty?
+        p["UdpEndPoints"] = network_configurator.udp_endpoints unless network_configurator.udp_endpoints.empty?
 
         p = p.merge(params)
         args = ["-t", "deploy", "-r", cloud_opts["resource_group_name"]]
@@ -139,26 +142,67 @@ module Bosh::AzureCloud
 
     def delete(instance_id)
       @logger.info("delete(#{instance_id})")
-      shutdown(instance_id)
-      invoke_azure_js_with_id(["delete", instance_id, "Microsoft.Compute/virtualMachines"])
-      invoke_azure_js_with_id(["delete", instance_id, "Microsoft.Network/loadBalancers"])
-      invoke_azure_js_with_id(["delete", instance_id, "Microsoft.Network/networkInterfaces"])
-      invoke_azure_js_with_id(["delete", instance_id, "Microsoft.Network/publicIPAddresses"])
+
+      disks = []
+      begin
+        disks = get_disks(instance_id)
+      rescue
+        @logger.warn("Cannot get data disks for #{instance_id}: #{e.message}\n#{e.backtrace.join("\n")}")
+      end
+      disks << get_os_disk_name(instance_id)
+
+      begin
+        invoke_azure_js_with_id(["delete", instance_id, "Microsoft.Compute/virtualMachines"])
+      rescue => e
+        @logger.warn("Cannot delete VM instance for #{instance_id}: #{e.message}\n#{e.backtrace.join("\n")}")
+      end
+
+      begin
+        invoke_azure_js_with_id(["delete", instance_id, "Microsoft.Network/loadBalancers"])
+      rescue => e
+        @logger.warn("Cannot delete load balancer for #{instance_id}: #{e.message}\n#{e.backtrace.join("\n")}")
+      end
+
+      begin
+        invoke_azure_js_with_id(["delete", instance_id, "Microsoft.Network/networkInterfaces"])
+      rescue => e
+        @logger.warn("Cannot network interfaces for #{instance_id}: #{e.message}\n#{e.backtrace.join("\n")}")
+      end
+
+      begin
+        invoke_azure_js_with_id(["delete", instance_id, "Microsoft.Network/publicIPAddresses"])
+      rescue => e
+        @logger.warn("Cannot delete public IP address for #{instance_id}: #{e.message}\n#{e.backtrace.join("\n")}")
+      end
+
+      disks.each do |disk|
+        begin
+          @disk_manager.delete_disk(disk)
+        rescue
+          @logger.warn("Cannot delete disk #{disk} for #{instance_id}: #{e.message}\n#{e.backtrace.join("\n")}")
+        end
+      end
     end
 
     def reboot(instance_id)
       @logger.info("reboot(#{instance_id})")
       invoke_azure_js_with_id(["restart", instance_id])
+    rescue => e
+      @logger.warn("Cannot reboot #{instance_id}: #{e.message}\n#{e.backtrace.join("\n")}")
     end
 
     def start(instance_id)
       @logger.info("start(#{instance_id})")
       invoke_azure_js_with_id(["start", instance_id])
+    rescue => e
+      @logger.warn("Cannot start #{instance_id}: #{e.message}\n#{e.backtrace.join("\n")}")
     end
 
     def shutdown(instance_id)
       @logger.info("shutdown(#{instance_id})")
       invoke_azure_js_with_id(["stop", instance_id])
+    rescue => e
+      @logger.warn("Cannot shutdown #{instance_id}: #{e.message}\n#{e.backtrace.join("\n")}")
     end
 
     def set_metadata(instance_id, metadata)

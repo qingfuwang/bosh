@@ -51,10 +51,10 @@ module Bosh::AzureCloud
       @blob_manager.get_blob_uri(@container_name, "#{disk_name}.vhd")
     end
 
-    def get_new_osdisk_uri(instance_id)
-      @logger.info("get_new_osdisk_uri(#{instance_id})")
-      destination_blob = instance_id + "_os_disk.vhd"
-      @blob_manager.get_blob_uri(@container_name, destination_blob)
+    def get_new_os_disk_uri(instance_id)
+      @logger.info("get_new_os_disk_uri(#{instance_id})")
+      os_disk_name = get_os_disk_name(instance_id)
+      @blob_manager.get_blob_uri(@container_name, "#{os_disk_name}.vhd")
     end
 
     def disks

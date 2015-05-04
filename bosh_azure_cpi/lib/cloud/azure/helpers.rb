@@ -41,6 +41,10 @@ module Bosh::AzureCloud
       cloud_error("Cannot parse resource group name from instance_id #{instance_id}. The format should be bosh-RESOURCEGROUPNAME--AGENTID")
     end
 
+    def get_os_disk_name(instance_id)
+      "#{instance_id}_os_disk"
+    end
+
     ##
     # Raises CloudError exception
     #
