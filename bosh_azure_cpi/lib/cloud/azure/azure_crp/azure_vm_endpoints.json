@@ -39,6 +39,10 @@
         },
         "subnetName": {
             "type": "string"
+        },
+       "apiVersion": {
+            "type": "string",
+            "defaultValue": "2015-05-01-preview"
         }
         },
     "variables" : {
@@ -53,7 +57,7 @@
     },
     "resources": [
     {
-      "apiVersion": "2014-12-01-preview",
+      "apiVersion": "[parameters('apiVersion')]",
       "type": "Microsoft.Network/publicIPAddresses",
       "name": "[parameters('publicIPAddressName')]",
       "location": "[parameters('location')]",
@@ -62,7 +66,7 @@
       }
     } ,
     {
-            "apiVersion": "2014-12-01-preview",
+           "apiVersion": "[parameters('apiVersion')]",
             "type": "Microsoft.Network/networkInterfaces",
             "name": "[parameters('nicName')]",
             "location": "[parameters('location')]",
@@ -90,7 +94,7 @@
             }
         },
     {
-      "apiVersion": "2014-12-01-preview",
+     "apiVersion": "[parameters('apiVersion')]",
       "name": "[parameters('lbName')]",
       "type": "Microsoft.Network/loadBalancers",
       "location": "[parameters('location')]",

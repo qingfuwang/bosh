@@ -81,12 +81,14 @@ module Bosh::AzureCloud
       node_js_file = File.join(File.dirname(__FILE__), "azure_crp", "azure_crp_compute.js")
       cmd = ["node", node_js_file]
       cmd.concat(args)
+      @logger.info(cmd[2..-1].join(" ")[0..200])
       result = {}
 
       node_path = ENV['NODE_PATH']
       node_path = "/usr/local/lib/node_modules" if node_path.nil? or node_path.empty?
-      
-      Open3.popen3({'NODE_PATH' => node_path}, *cmd) { |stdin, stdout, stderr, wait_thr|
+      node_env = {'NODE_PATH' => node_path}
+    
+      Open3.popen3(node_env, *cmd) { |stdin, stdout, stderr, wait_thr|
         data = ""
         stdstr = ""
         begin
@@ -119,10 +121,8 @@ module Bosh::AzureCloud
           cloud_error("Can't find token in ~/.azure/azureProfile.json or ~/.azure/accessTokens.json\nTry azure login\n") if result["Failed"]["code"] =~/RefreshToken Fail/
         end
 
-        ret = nil
-        if result["Failed"].nil?
-          ret = result["R"][0].nil? ? result["R"] : result["R"][0]
-        end
+       result["R"]
+
       }
     end
 
@@ -130,7 +130,6 @@ module Bosh::AzureCloud
       task = arg[0]
       instance_id = arg[1]
 
-      @logger.info("invoke azure js #{task} instance_id #{instance_id}")
       begin
         resource_group_name = parse_resource_group_from_instance_id(instance_id)
         @logger.debug("resource_group_name is #{resource_group_name}")

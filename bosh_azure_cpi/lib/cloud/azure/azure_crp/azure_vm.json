@@ -52,6 +52,10 @@
         },
         "subnetName": {
             "type": "string"
+        },
+     "apiVersion": {
+            "type": "string",
+            "defaultValue": "2015-05-01-preview"
         }
     },
     "variables": {
@@ -61,7 +65,7 @@
         "sshKeyPath": "[concat('/home/',parameters('adminUsername'),'/.ssh/authorized_keys')]"
     },
     "resources": [{
-            "apiVersion": "2014-12-01-preview",
+            "apiVersion": "[parameters('apiVersion')]",
             "type": "Microsoft.Network/networkInterfaces",
             "name": "[parameters('nicName')]",
             "location": "[parameters('location')]",
@@ -81,7 +85,7 @@
             }
         },
         {
-            "apiVersion": "2014-12-01-preview",
+            "apiVersion": "[parameters('apiVersion')]",
             "type": "Microsoft.Compute/virtualMachines",
             "name": "[parameters('vmName')]",
             "location": "[parameters('location')]",
@@ -97,7 +101,6 @@
                     "computername": "[parameters('vmName')]",
                     "adminUsername": "[parameters('adminUsername')]",
                     "linuxConfiguration": {
-                        "provisionVMAgent": "true",
                         "disablePasswordAuthentication": "true",
                         "ssh": {
                             "publicKeys": [

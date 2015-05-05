@@ -113,7 +113,7 @@ module Bosh::AzureCloud
         ret = invoke_azure_js_with_id(["get", instance_id, "Microsoft.Compute/virtualMachines"])
         unless ret.nil?
           vm = JSON(ret)
-          publicip = invoke_azure_js_with_id(["get", instance_id, "Microsoft.Network/publicIPAddresses"])
+          publicip = invoke_azure_js_with_id(["get", instance_id, "Microsoft.Network/publicIPAddresses",'--silence'])
           publicip = JSON(publicip) unless publicip.nil?
           dipaddress = publicip.nil? ? nil : publicip["properties"]["ipAddress"]
           data_disks = []
@@ -135,7 +135,7 @@ module Bosh::AzureCloud
           }
         end
       rescue => e
-        @logger.debug("Cannot find instance by id #{instance_id}: #{e.message}")
+        @logger.debug("Cannot find instance by id #{instance_id}: #{e.message}  #{e.backtrace.join("\n")} ")
       end
 
       instance
@@ -147,7 +147,7 @@ module Bosh::AzureCloud
       disks = []
       begin
         disks = get_disks(instance_id)
-      rescue
+      rescue => e
         @logger.warn("Cannot get data disks for #{instance_id}: #{e.message}\n#{e.backtrace.join("\n")}")
       end
       disks << get_os_disk_name(instance_id)
@@ -220,7 +220,7 @@ module Bosh::AzureCloud
 
       user_data["server"]["name"]
     end
-    
+
     ##
     # Attach a disk to the Vm
     #
@@ -233,13 +233,13 @@ module Bosh::AzureCloud
       invoke_azure_js_with_id(["adddisk", instance_id, disk_uri])
       get_volume_name(instance_id, disk_name)
     end
-    
+
     def detach_disk(instance_id, disk_name)
       @logger.info("detach_disk(#{instance_id}, #{disk_name})")
       disk_uri= @disk_manager.get_disk_uri(disk_name)
       invoke_azure_js_with_id(["rmdisk", instance_id, disk_uri])
     end
-    
+
     def get_disks(instance_id)
       @logger.info("get_disks(#{instance_id})")
       vm = find(instance_id) || cloud_error('Given instance id does not exist')
@@ -258,7 +258,7 @@ module Bosh::AzureCloud
       user_data[:dns] = {nameserver: dns} if dns
       Base64.strict_encode64(Yajl::Encoder.encode(user_data))
     end
-    
+
     def get_volume_name(instance_id, disk_name)
       data_disk = find(instance_id)["data_disks"].find { |disk| disk["name"] == disk_name}
       data_disk || cloud_error('Given disk name is not attached to given instance id')
@@ -266,10 +266,10 @@ module Bosh::AzureCloud
       @logger.info("get_volume_name return lun #{lun}")
       "/dev/sd#{('c'.ord + lun).chr}"
     end
-    
+
     def get_disk_lun(data_disk)
       data_disk["lun"] != "" ? data_disk["lun"].to_i : 0
     end
-    
+
   end
 end
