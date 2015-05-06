@@ -234,7 +234,7 @@ var waitDeploymentSuccess = function (doDeployTask, id, resourcegroup, deploymen
                         err_msg += JSON.stringify(t.properties.statusMessage)
                     })
 
-                    if (err_msg.indexOf("NetworkingInternalOperationError") > -1) {
+                    if (err_msg.match(/NetworkingInternalOperationError|ContainerAlreadyOnLease/)) {
                       deploymentname.id = null;
                       _log("Failed " + err_msg)
                       finishedCallback(RETRY, "Retry internal error");
@@ -1002,5 +1002,4 @@ var main = function () {
         _log("##RESULTEND##")
       });
 };
-
 main();
