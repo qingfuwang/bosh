@@ -18,7 +18,7 @@ var ABORT = {
 };
 var api_version = "2015-05-01-preview";
 var get_log_api_version = "2014-04-01-preview"
-var x_ms_version = '2014-04-01-preview';
+var x_ms_version = '2015-05-01-preview';
 var _resultStr = null;
 var _logStr = [];
 var silence = false;
@@ -119,7 +119,7 @@ var azureCommand = function (p, callback, env_opt) {
 };
 
 var NatRule = {
-  "name": "ssh",
+  "name": "",
   "properties": {
     "frontendIPConfiguration": {
       "id": "[variables('frontEndIPConfigID')]"
@@ -127,9 +127,9 @@ var NatRule = {
     "backendIPConfiguration": {
       "id": "[variables('backEndIPConfigID')]"
     },
-    "protocol": "TCP",
-    "frontendPort": 22,
-    "backendPort": 22,
+    "protocol": "",
+    "frontendPort": "",
+    "backendPort": "",
     "enableFloatingIP": false
   }
 }
@@ -491,7 +491,7 @@ var getToken = function (forceRefresh) {
   if (typeof (forceRefresh) == 'undefined') {
     forceRefresh = false;
   }
-  var expiretime = Math.floor(Math.random() * (1200 * 1000) + 60 * 1000);
+  var expiretime = Math.floor(Math.random() * (600 * 1000) + 60 * 1000);
   var accessTokenPath = path.join(HOMEDIR, ".azure/accessTokens.json")
   if (fs.existsSync(accessTokenPath)) {
     var token = fs.readFileSync(accessTokenPath);
