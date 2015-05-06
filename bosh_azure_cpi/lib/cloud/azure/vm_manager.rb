@@ -48,7 +48,7 @@ module Bosh::AzureCloud
       args.push(File.join(File.dirname(__FILE__),"azure_crp","azure_vm.json"))
       args.push(Base64.encode64(params.to_json()))
 
-      result = invoke_azure_js(args)
+      result = invoke_azure_js(args,true)
       cloud_error("Create virtual machine failed") if result.nil?
 
       unless network_configurator.vip_network.nil?
@@ -62,7 +62,7 @@ module Bosh::AzureCloud
                 network_configurator.reserved_ip,
                 "Microsoft.Network/publicIPAddresses"
               ]
-        ipname = invoke_azure_js(args)
+        ipname = invoke_azure_js(args,true)
 
         #if vip is not a reserved ip, then create an ipaddress with given label name
         if ipname.nil? || ipname.empty?
@@ -77,7 +77,7 @@ module Bosh::AzureCloud
                   ipname,
                   instance_id
                  ]
-          result = invoke_azure_js(args)
+          result = invoke_azure_js(args,true)
           cloud_error("Create public IPAddress failed") if result.nil?
         end
 
@@ -96,7 +96,7 @@ module Bosh::AzureCloud
         args = ["-t", "deploy", "-r", cloud_opts["resource_group_name"]]
         args.push(File.join(File.dirname(__FILE__), "azure_crp", ip_crp_template))
         args.push(Base64.encode64(p.to_json()))
-        result = invoke_azure_js(args)
+        result = invoke_azure_js(args,true)
         cloud_error("Bind IP and endpoints failed") if result.nil?
       end
 
