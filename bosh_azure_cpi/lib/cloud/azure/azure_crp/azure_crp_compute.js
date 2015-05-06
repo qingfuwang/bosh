@@ -997,7 +997,7 @@ var main = function () {
         _log("##RESULTBEGIN##")
         _log(JSON.stringify({
           "R": _resultStr,
-          "Failed": [error,result]
+          "Failed": error
         }));
         _log("##RESULTEND##")
       });
