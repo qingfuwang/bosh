@@ -49,7 +49,6 @@ module Bosh::AzureCloud
       args.push(Base64.encode64(params.to_json()))
 
       result = invoke_azure_js(args, true)
-      cloud_error("Create virtual machine failed") if result.nil?
 
       unless network_configurator.vip_network.nil?
         ip_crp_template = 'azure_vm_endpoints.json'
@@ -78,7 +77,6 @@ module Bosh::AzureCloud
                   instance_id
                  ]
           result = invoke_azure_js(args, true)
-          cloud_error("Create public IPAddress failed") if result.nil?
         end
 
         #bind the ip or endpoint to nic of that vm
@@ -97,7 +95,6 @@ module Bosh::AzureCloud
         args.push(File.join(File.dirname(__FILE__), "azure_crp", ip_crp_template))
         args.push(Base64.encode64(p.to_json()))
         result = invoke_azure_js(args, true)
-        cloud_error("Bind IP and endpoints failed") if result.nil?
       end
 
       instance_id
